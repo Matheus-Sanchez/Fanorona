@@ -24,21 +24,33 @@ configuracao_inicial = [
 # Cria o tabuleiro, as peças e a movimentação
 tabuleiro = Tabuleiro(tela_largura, tela_altura, cor_celula=(255, 255, 255))  # Cor das células branca
 pecas = GerenciadorPecas(5, 9, 100, (tela_largura - 900) // 2, (tela_altura - 500) // 2, configuracao_inicial)
-movimentacao = Movimentacao(5, 9, 100, (tela_largura - 900) // 2, (tela_altura - 500) // 2, pecas)
+movimentacao = Movimentacao(5, 9, 100, (tela_largura - 900) // 2, (tela_altura - 500) // 2, pecas, configuracao_inicial)
 
+for configuracao in configuracao_inicial:
+    print(f"{configuracao} \n")
+    
 # Loop principal do jogo
 rodando = True
 while rodando:
-    tela.fill((255, 255, 255))  # BRANCO
+    tela.fill((255, 255, 255))
+    
     tabuleiro.desenhar(tela)
     pecas.desenhar_pecas(tela)
-    movimentacao.desenhar_pecas(tela)
+    movimentacao.gerenciador_pecas.desenhar_pecas(tela)
+    movimentacao.desenhar_borda_selecao(tela)
+    movimentacao.desenhar_movimentos()  # Mantém os círculos na tela
+    
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             rodando = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:  # Captura clique do mouse
+            x, y = event.pos
+            movimentacao.processar_clique(x, y)
         elif event.type == pygame.KEYDOWN:
             movimentacao.processar_eventos(event)
+
+
     
     pygame.display.flip()
     

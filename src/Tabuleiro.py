@@ -19,8 +19,8 @@ class Tabuleiro:
         tela.fill(self.cor_fundo)
         for i in range(self.linhas):
             for j in range(self.colunas):
-                x = self.offset_x + j * self.tamanho_celula
-                y = self.offset_y + i * self.tamanho_celula
+                x = self.offset_x + j * self.tamanho_celula + self.tamanho_celula / 2
+                y = self.offset_y + i * self.tamanho_celula + self.tamanho_celula / 2
                 
 
                 # Conectar pontos adjacentes
@@ -30,11 +30,12 @@ class Tabuleiro:
                     pygame.draw.line(tela, self.cor_linha, (x, y), (x, y + self.tamanho_celula), 2)
                 
                 # Conexões diagonais
-                if i < self.linhas - 1 and j < self.colunas - 1:
-                    pygame.draw.line(tela, self.cor_linha, (x, y), (x + self.tamanho_celula, y + self.tamanho_celula), 2)
-                if i < self.linhas - 1 and j > 0:
-                    pygame.draw.line(tela, self.cor_linha, (x, y), (x - self.tamanho_celula, y + self.tamanho_celula), 2)
-                
+                if i % 2 == j % 2: 
+                    if i < self.linhas - 1 and j < self.colunas - 1:
+                        pygame.draw.line(tela, self.cor_linha, (x, y), (x + self.tamanho_celula, y + self.tamanho_celula), 2)
+                    if i < self.linhas - 1 and j > 0:
+                        pygame.draw.line(tela, self.cor_linha, (x, y), (x - self.tamanho_celula, y + self.tamanho_celula), 2)
+                    
                 # Desenhar os pontos
                 pygame.draw.circle(tela, self.cor_linha, (x, y), 8)
                 
