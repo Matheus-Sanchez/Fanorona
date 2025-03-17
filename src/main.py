@@ -41,16 +41,25 @@ while rodando:
     movimentacao.desenhar_movimentos()  # Mantém os círculos na tela
     
     
+    # Desenhar botões de captura, se estiverem ativos
+    if hasattr(pecas, 'escolha_captura_ativa') and pecas.escolha_captura_ativa:
+        pecas.desenhar_botoes_captura(tela)
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             rodando = False
         elif event.type == pygame.MOUSEBUTTONDOWN:  # Captura clique do mouse
             x, y = event.pos
+            
+            # Primeiro tenta processar cliques nos botões de captura
+            if hasattr(pecas, 'escolha_captura_ativa') and pecas.escolha_captura_ativa:
+                if pecas.processar_clique_botoes(x, y):
+                    continue  # Se o clique foi em um botão, não processamos como movimento
+            
+            # Se não foi um clique em botão, processa normalmente
             movimentacao.processar_clique(x, y)
         elif event.type == pygame.KEYDOWN:
             movimentacao.processar_eventos(event)
-
-
     
     pygame.display.flip()
     

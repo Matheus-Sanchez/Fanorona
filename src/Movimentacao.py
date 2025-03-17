@@ -39,6 +39,10 @@ class Movimentacao:
         coluna = (x - self.tabuleiro_offset_x) // self.tamanho_celula
         linha = (y - self.tabuleiro_offset_y) // self.tamanho_celula
 
+        # Se houver uma escolha de captura ativa, ignoramos cliques no tabuleiro
+        if hasattr(self.gerenciador_pecas, 'escolha_captura_ativa') and self.gerenciador_pecas.escolha_captura_ativa:
+            return
+
         if 0 <= linha < self.tabuleiro_linhas and 0 <= coluna < self.tabuleiro_colunas:
             if not self.gerenciador_pecas.posicao_vazia(linha, coluna):
                 print(f"Peça selecionada na posição ({linha}, {coluna})")
@@ -49,9 +53,29 @@ class Movimentacao:
                 # Se clicar em uma casa vazia e já tiver peça selecionada, tenta mover
                 if self.peca_selecionada and (linha, coluna) in self.movimentos_possiveis:
                     print(f"Movendo para ({linha}, {coluna})")
-                    self.mover_peca(linha, coluna)
-                    self.peca_selecionada = None
-                    self.movimentos_possiveis = []  # Limpa os círculos após o movimento
+                    linha_atual, coluna_atual = self.peca_selecionada
+                    
+                    # Move a peça
+                    self.gerenciador_pecas.mover_peca(linha_atual, coluna_atual, linha, coluna, self.configuracao_inicial, tela)
+                    
+                    # Modificação: Salvar referência à Movimentacao no GerenciadorPecas para uso posterior
+                    self.gerenciador_pecas.movimentacao_ref = self
+                    
+                    # Verifica e processa capturas (agora pode mostrar opções)
+                    self.gerenciador_pecas.capturar_pecas(linha_atual, coluna_atual, linha, coluna, self.configuracao_inicial, tela)
+                    
+                    # Só limpa a seleção se não houver escolha de captura ativa
+                    if not hasattr(self.gerenciador_pecas, 'escolha_captura_ativa') or not self.gerenciador_pecas.escolha_captura_ativa:
+                        self.limpar_selecao()
+
+                    print("Estado atual: ")
+                    for configuracao in self.configuracao_inicial:
+                        print(f"{configuracao} \n")
+
+    def limpar_selecao(self):
+        """Método auxiliar para limpar seleção e possíveis movimentos"""
+        self.peca_selecionada = None
+        self.movimentos_possiveis = []
 
     def possiveis_movimentos(self):
         linha, coluna = self.peca_selecionada
@@ -86,10 +110,6 @@ class Movimentacao:
         
         self.gerenciador_pecas.mover_peca(linha_atual, coluna_atual, nova_linha, nova_coluna, self.configuracao_inicial, tela)
         self.gerenciador_pecas.capturar_pecas(linha_atual, coluna_atual, nova_linha, nova_coluna, self.configuracao_inicial, tela)
-
-        print("Movimentação: \n")
-        for configuracao in self.configuracao_inicial:
-            print(f"{configuracao} \n")
     
 
     def desenhar_borda_selecao(self, tela):

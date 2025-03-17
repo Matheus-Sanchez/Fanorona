@@ -39,10 +39,3 @@ class Tabuleiro:
                 # Desenhar os pontos
                 pygame.draw.circle(tela, self.cor_linha, (x, y), 8)
                 
-                
-                
-                
-                
-                
-
-
