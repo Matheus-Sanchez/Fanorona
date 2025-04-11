@@ -1,23 +1,5 @@
 import pygame
 
-from Pecas import GerenciadorPecas
-
-# Configurações do tabuleiro
-tabuleiro_linhas, tabuleiro_colunas = 5, 9
-tamanho_celula = 100
-tabuleiro_offset_x = 50
-tabuleiro_offset_y = 50
-
-# Inicializa o Pygame
-pygame.init()
-tela = pygame.display.set_mode((tabuleiro_colunas * tamanho_celula + 100, tabuleiro_linhas * tamanho_celula + 100))
-pygame.display.set_caption("Movimentação Fanorona")
-
-# Cores
-BRANCO = (255, 255, 255)
-PRETO = (0, 0, 0)
-VERMELHO = (200, 0, 0)
-
 class Movimentacao:
     DIRECOES_8 = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
     DIRECOES_4 = [(-1, 0), (0, -1), (0, 1), (1, 0)]
@@ -29,48 +11,83 @@ class Movimentacao:
         self.tabuleiro_offset_x = tabuleiro_offset_x
         self.tabuleiro_offset_y = tabuleiro_offset_y
         self.gerenciador_pecas = gerenciador_pecas
-        self.pecas = [(2, 4)]  # Exemplo de peça no meio do tabuleiro
         self.peca_selecionada = None
         self.movimentos_possiveis = []  # Armazena os movimentos ativos
         self.configuracao_inicial = configuracao_inicial
+        self.captura_ref = None  # Referência para o objeto Captura
     
-    # Verifica se o clique foi dentro dos limites do tabuleiro
-    def processar_clique(self, x, y):
+    def set_captura_ref(self, captura):
+        """Define a referência para o objeto Captura"""
+        self.captura_ref = captura
+        captura.movimentacao_ref = self  # Define a referência mútua
+    
+    def processar_clique(self, x, y, jogador_atual):
         coluna = (x - self.tabuleiro_offset_x) // self.tamanho_celula
         linha = (y - self.tabuleiro_offset_y) // self.tamanho_celula
 
         # Se houver uma escolha de captura ativa, ignoramos cliques no tabuleiro
-        if hasattr(self.gerenciador_pecas, 'escolha_captura_ativa') and self.gerenciador_pecas.escolha_captura_ativa:
-            return
+        if self.captura_ref and self.captura_ref.escolha_captura_ativa:
+            return False  # Nenhuma ação realizada no tabuleiro
+
+        # Verificar se estamos em uma captura em cadeia
+        em_captura_cadeia = self.captura_ref and self.captura_ref.captura_em_cadeia_ativa
 
         if 0 <= linha < self.tabuleiro_linhas and 0 <= coluna < self.tabuleiro_colunas:
+            # Se estivermos em uma captura em cadeia, só podemos selecionar a peça que acabou de capturar
+            if em_captura_cadeia and self.peca_selecionada:
+                linha_sel, coluna_sel = self.peca_selecionada
+                if linha != linha_sel or coluna != coluna_sel:
+                    # Se clicar em uma casa vazia que é um movimento possível, permitir o movimento
+                    if self.gerenciador_pecas.posicao_vazia(linha, coluna) and (linha, coluna) in self.movimentos_possiveis:
+                        return self.mover_peca(linha, coluna, jogador_atual)
+                    return False  # Não permite selecionar outra peça durante captura em cadeia
+            
+            # Clique em uma peça
             if not self.gerenciador_pecas.posicao_vazia(linha, coluna):
+                # Verificar se a peça clicada pertence ao jogador atual
+                peca_tipo = self.gerenciador_pecas.obter_tipo_peca(linha, coluna)
+                if peca_tipo != jogador_atual:
+                    print(f"Não é a vez do jogador {peca_tipo}")
+                    return False  # Não é a vez deste jogador
+                
                 print(f"Peça selecionada na posição ({linha}, {coluna})")
                 self.peca_selecionada = (linha, coluna)
-                self.desenhar_borda_selecao(tela)
                 self.movimentos_possiveis = self.possiveis_movimentos()
+                return False  # Apenas selecionou uma peça, não trocou o turno
+            
+            # Clique em uma casa vazia
             else:
                 # Se clicar em uma casa vazia e já tiver peça selecionada, tenta mover
                 if self.peca_selecionada and (linha, coluna) in self.movimentos_possiveis:
-                    print(f"Movendo para ({linha}, {coluna})")
-                    linha_atual, coluna_atual = self.peca_selecionada
-                    
-                    # Move a peça
-                    self.gerenciador_pecas.mover_peca(linha_atual, coluna_atual, linha, coluna, self.configuracao_inicial, tela)
-                    
-                    # Modificação: Salvar referência à Movimentacao no GerenciadorPecas para uso posterior
-                    self.gerenciador_pecas.movimentacao_ref = self
-                    
-                    # Verifica e processa capturas (agora pode mostrar opções)
-                    self.gerenciador_pecas.capturar_pecas(linha_atual, coluna_atual, linha, coluna, self.configuracao_inicial, tela)
-                    
-                    # Só limpa a seleção se não houver escolha de captura ativa
-                    if not hasattr(self.gerenciador_pecas, 'escolha_captura_ativa') or not self.gerenciador_pecas.escolha_captura_ativa:
-                        self.limpar_selecao()
+                    return self.mover_peca(linha, coluna, jogador_atual)
+        
+        return False  # Nenhuma ação que mude o turno foi realizada
 
-                    print("Estado atual: ")
-                    for configuracao in self.configuracao_inicial:
-                        print(f"{configuracao} \n")
+    def mover_peca(self, nova_linha, nova_coluna, jogador_atual):
+        """Método para mover a peça selecionada para uma nova posição"""
+        linha_atual, coluna_atual = self.peca_selecionada
+        
+        # Move a peça
+        self.gerenciador_pecas.mover_peca(linha_atual, coluna_atual, nova_linha, nova_coluna, 
+                                        self.configuracao_inicial, pygame.display.get_surface())
+        
+        # Verifica e processa capturas (retorna True se houve captura)
+        captura_realizada = False
+        if self.captura_ref:
+            captura_realizada = self.captura_ref.capturar_pecas(linha_atual, coluna_atual, nova_linha, nova_coluna, 
+                                                            self.configuracao_inicial, pygame.display.get_surface())
+        
+        # Só limpa a seleção se não houver escolha de captura ativa e não estiver em uma captura em cadeia
+        if not (self.captura_ref and (self.captura_ref.escolha_captura_ativa or self.captura_ref.captura_em_cadeia_ativa)):
+            self.limpar_selecao()
+        
+        print("Estado atual: ")
+        for configuracao in self.configuracao_inicial:
+            print(f"{configuracao} \n")
+        
+        # Retorna True para indicar que o movimento foi concluído e pode trocar de turno
+        # (mas a troca só acontecerá se não houver capturas em cadeia)
+        return True
 
     def limpar_selecao(self):
         """Método auxiliar para limpar seleção e possíveis movimentos"""
@@ -95,7 +112,7 @@ class Movimentacao:
                     movimentos.append((nova_linha, nova_coluna))
         return movimentos
 
-    def desenhar_movimentos(self):
+    def desenhar_movimentos(self, tela):
         # Desenha os círculos para os movimentos válidos
         for movimento in self.movimentos_possiveis:
             linha, coluna = movimento
@@ -103,14 +120,6 @@ class Movimentacao:
             pos_y = self.tabuleiro_offset_y + (linha * self.tamanho_celula) + self.tamanho_celula // 2
 
             pygame.draw.circle(tela, (255, 0, 0), (pos_x, pos_y), 15)
-
-    def mover_peca(self, nova_linha, nova_coluna):
-        # Move a peça e atualiza o tabuleiro
-        linha_atual, coluna_atual = self.peca_selecionada
-        
-        self.gerenciador_pecas.mover_peca(linha_atual, coluna_atual, nova_linha, nova_coluna, self.configuracao_inicial, tela)
-        self.gerenciador_pecas.capturar_pecas(linha_atual, coluna_atual, nova_linha, nova_coluna, self.configuracao_inicial, tela)
-    
 
     def desenhar_borda_selecao(self, tela):
         if self.peca_selecionada != None:
@@ -122,35 +131,6 @@ class Movimentacao:
             if self.peca_selecionada == (linha, coluna):
                 pygame.draw.circle(tela, (255, 255, 255), (x + self.tamanho_celula // 2, y + self.tamanho_celula // 2), 30, 3)
 
-
-
-
-
-
-    # def processar_eventos(self, event):
-    #     linha, coluna = self.pecas[0]
-    #     if linha % 2 == coluna % 2:
-    #         direcoes = self.DIRECOES_8
-    #     else:
-    #         direcoes = self.DIRECOES_4
-
-    #     if event.key == pygame.K_UP:
-    #         self.mover_peca(0, direcoes[0])
-    #     elif event.key == pygame.K_DOWN:
-    #         self.mover_peca(0, direcoes[3])
-    #     elif event.key == pygame.K_LEFT:
-    #         self.mover_peca(0, direcoes[1])
-    #     elif event.key == pygame.K_RIGHT:
-    #         self.mover_peca(0, direcoes[2])
-    #     elif linha % 2 == coluna % 2:
-    #         if event.key == pygame.K_w:
-    #             self.mover_peca(0, direcoes[0])
-    #         elif event.key == pygame.K_e:
-    #             self.mover_peca(0, direcoes[2])
-    #         elif event.key == pygame.K_a:
-    #             self.mover_peca(0, direcoes[4])
-    #         elif event.key == pygame.K_d:
-    #             self.mover_peca(0, direcoes[6])
-
-# movimentacao = Movimentacao(tabuleiro_linhas, tabuleiro_colunas, tamanho_celula, tabuleiro_offset_x, tabuleiro_offset_y, GerenciadorPecas)
-
+    def processar_eventos(self, evento):
+        # Este método pode ser implementado para lidar com entradas de teclado
+        pass
