@@ -150,6 +150,12 @@ def main():
         pecas.desenhar_pecas(tela)
         movimentacao.desenhar_movimentos(tela)
         
+        # Se houver alguma captura disponível para o jogador atual, destaca as peças elegíveis
+        if movimentacao.captura_ref and movimentacao.existe_captura_geral(jogador_atual):
+            movimentacao.destacar_pecas_com_captura(tela, jogador_atual)
+        
+        movimentacao.desenhar_movimentos(tela)
+
         # Desenhar a borda de seleção se uma peça estiver selecionada
         if movimentacao.peca_selecionada:
             movimentacao.desenhar_borda_selecao(tela)
