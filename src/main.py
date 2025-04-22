@@ -150,6 +150,12 @@ def main():
         pecas.desenhar_pecas(tela)
         movimentacao.desenhar_movimentos(tela)
         
+        # Se houver alguma captura disponível para o jogador atual, destaca as peças elegíveis
+        if movimentacao.captura_ref and movimentacao.existe_captura_geral(jogador_atual):
+            movimentacao.destacar_pecas_com_captura(tela, jogador_atual)
+        
+        movimentacao.desenhar_movimentos(tela)
+
         # Desenhar a borda de seleção se uma peça estiver selecionada
         if movimentacao.peca_selecionada:
             movimentacao.desenhar_borda_selecao(tela)
@@ -206,12 +212,17 @@ def main():
                     else:
                         # Processar clique no tabuleiro
                         movimento_realizado = movimentacao.processar_clique(x, y, jogador_atual)
-                        
-                        # Trocar turno apenas se um movimento foi concluído e não há capturas em cadeia ativas
-                        if movimento_realizado and not captura.captura_em_cadeia_ativa:
+
+                        # Trocar turno apenas se:
+                        # 1. Houve movimento concluído
+                        # 2. Não há captura em cadeia ativa
+                        # 3. Não há escolha de captura aguardando decisão
+                        if movimento_realizado \
+                           and not captura.captura_em_cadeia_ativa \
+                           and not captura.escolha_captura_ativa:
                             jogador_atual = "b" if jogador_atual == "v" else "v"
-                elif evento.type == pygame.KEYDOWN:
-                    movimentacao.processar_eventos(evento)
+                        elif evento.type == pygame.KEYDOWN:
+                            movimentacao.processar_eventos(evento)
                 
     pygame.quit()
 

@@ -170,6 +170,28 @@ class Movimentacao:
                     if cap_aproximacao or cap_afastamento:
                         movimentos_captura.append((nova_linha, nova_coluna))
         return movimentos_captura if movimentos_captura else movimentos
+    
+    
+    def destacar_pecas_com_captura(self, tela, jogador_atual):
+        """
+        Percorre todo o tabuleiro e destaca (com um círculo verde)
+        as peças do jogador atual que têm movimentos de captura disponíveis.
+        """
+        # Obter os parâmetros de exibição a partir do gerenciador de peças
+        offset_x = self.gerenciador_pecas.offset_x
+        offset_y = self.gerenciador_pecas.offset_y
+        tamanho_celula = self.gerenciador_pecas.tamanho_celula
+
+        for i in range(self.tabuleiro_linhas):
+            for j in range(self.tabuleiro_colunas):
+                if self.configuracao_inicial[i][j] == jogador_atual:
+                    # Se a peça possui captura disponível, destaca-a
+                    if self.possiveis_capturas(i, j):
+                        center_x = offset_x + j * tamanho_celula + tamanho_celula // 2
+                        center_y = offset_y + i * tamanho_celula + tamanho_celula // 2
+                        # Desenha um círculo verde com espessura 3 para chamar a atenção
+                        pygame.draw.circle(tela, (0, 255, 0), (center_x, center_y), tamanho_celula // 2 - 20, 3)
+
 
     def desenhar_movimentos(self, tela):
         # Desenha os círculos para os movimentos válidos
