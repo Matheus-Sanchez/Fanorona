@@ -212,12 +212,17 @@ def main():
                     else:
                         # Processar clique no tabuleiro
                         movimento_realizado = movimentacao.processar_clique(x, y, jogador_atual)
-                        
-                        # Trocar turno apenas se um movimento foi concluído e não há capturas em cadeia ativas
-                        if movimento_realizado and not captura.captura_em_cadeia_ativa:
+
+                        # Trocar turno apenas se:
+                        # 1. Houve movimento concluído
+                        # 2. Não há captura em cadeia ativa
+                        # 3. Não há escolha de captura aguardando decisão
+                        if movimento_realizado \
+                           and not captura.captura_em_cadeia_ativa \
+                           and not captura.escolha_captura_ativa:
                             jogador_atual = "b" if jogador_atual == "v" else "v"
-                elif evento.type == pygame.KEYDOWN:
-                    movimentacao.processar_eventos(evento)
+                        elif evento.type == pygame.KEYDOWN:
+                            movimentacao.processar_eventos(evento)
                 
     pygame.quit()
 
