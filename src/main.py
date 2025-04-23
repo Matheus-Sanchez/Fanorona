@@ -3,6 +3,9 @@ from Tabuleiro import Tabuleiro
 from Pecas import GerenciadorPecas
 from Movimentacao import Movimentacao
 from Captura import Captura
+from MiniMax.__main__ import escolher_movimento_ia
+from MiniMax.config import IA_PLAYER, HUMANO_PLAYER
+
 
 def exibir_imagem(tela):
     imagem = pygame.image.load("./assets/tutorial.jpg")  # Substitua pelo caminho da imagem
@@ -28,29 +31,32 @@ def exibir_imagem(tela):
 def menu_inicial(tela):
     fonte = pygame.font.Font(None, 74)
     texto_titulo = fonte.render("Jogo de Tabuleiro", True, (255, 255, 255))
-    texto_jogar = fonte.render("1 - Jogar", True, (255, 255, 255))
-    texto_imagem = fonte.render("2 - Ver Imagem", True, (255, 255, 255))
-    texto_sair = fonte.render("3 - Sair", True, (255, 255, 255))
+    texto_jogar = fonte.render("1 - Jogar (Humano vs Humano)", True, (255, 255, 255))
+    texto_ia = fonte.render("2 - Jogar contra IA (MiniMax)", True, (255, 255, 255))
+    texto_imagem = fonte.render("3 - Ver Imagem", True, (255, 255, 255))
+    texto_sair = fonte.render("4 - Sair", True, (255, 255, 255))
 
-    rodando = True
-    while rodando:
+    while True:
         tela.fill((0, 0, 0))
-        tela.blit(texto_titulo, (150, 100))
-        tela.blit(texto_jogar, (200, 250))
-        tela.blit(texto_imagem, (200, 350))
-        tela.blit(texto_sair, (200, 450))
+        tela.blit(texto_titulo, (100, 50))
+        tela.blit(texto_jogar, (100, 150))
+        tela.blit(texto_ia, (100, 250))
+        tela.blit(texto_imagem, (100, 350))
+        tela.blit(texto_sair, (100, 450))
         pygame.display.flip()
         
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 pygame.quit()
                 exit()
-            if evento.type == pygame.KEYDOWN:
+            elif evento.type == pygame.KEYDOWN:
                 if evento.key == pygame.K_1:
                     return "jogar"
                 elif evento.key == pygame.K_2:
-                    return "imagem"
+                    return "ia"
                 elif evento.key == pygame.K_3:
+                    return "imagem"
+                elif evento.key == pygame.K_4:
                     pygame.quit()
                     exit()
                     
@@ -114,11 +120,12 @@ def main():
     while True:
         escolha = menu_inicial(tela)
         if escolha == "imagem":
-            exibir_imagem(tela)  # Exibir imagem e depois voltar ao menu
-        elif escolha == "jogar":
-            break  # Sai do loop para iniciar o jogo
-        else:
-            return  # Sai do programa
+            exibir_imagem(tela)
+        elif escolha == "sair":
+            return
+        elif escolha in ("jogar", "ia"):
+            modo_ia = (escolha == "ia")
+            break
     
     # Inicia o jogo normalmente
     configuracao_inicial = [
@@ -149,7 +156,7 @@ def main():
         tabuleiro.desenhar(tela)
         pecas.desenhar_pecas(tela)
         movimentacao.desenhar_movimentos(tela)
-        
+  
         # Se houver alguma captura disponível para o jogador atual, destaca as peças elegíveis
         if movimentacao.captura_ref and movimentacao.existe_captura_geral(jogador_atual):
             movimentacao.destacar_pecas_com_captura(tela, jogador_atual)
@@ -196,8 +203,36 @@ def main():
             texto_vencedor = fonte_grande.render(mensagem_vencedor, True, (255, 0, 0))
             tela.blit(texto_vencedor, (largura // 2 - texto_vencedor.get_width() // 2, 20))
         
-        pygame.display.flip()
+
         
+        if modo_ia and mensagem_vencedor is None \
+                   and jogador_atual == IA_PLAYER \
+                   and not captura.escolha_captura_ativa \
+                   and not captura.captura_em_cadeia_ativa:
+                   # copia estado lógico (v, b ou -)
+                   estado_ia = [list(l) for l in configuracao_inicial]
+                   melhor_jogada, _ = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=3)
+                   if melhor_jogada:
+                       (i1, j1), (i2, j2) = melhor_jogada
+                       # prepara o movimento na camada de lógica + GUI
+                       movimentacao.peca_selecionada = (i1, j1)
+                       movimentacao.movimentos_possiveis = [(i2, j2)]
+                       movimentacao.mover_peca(i2, j2, IA_PLAYER)
+                       movimentacao.limpar_selecao()  # evita peças "presas" selecionadas
+                       # troca turno se não houver cadeia de captura
+                       if not captura.captura_em_cadeia_ativa \
+                          and not captura.escolha_captura_ativa:
+                           jogador_atual = HUMANO_PLAYER
+                   else:
+                       # sem jogadas possíveis → declare fim ou passe o turno
+                       resultado = verificar_fim_de_jogo(configuracao_inicial)
+                       if resultado:
+                           mensagem_vencedor = resultado
+                       else:
+                           jogador_atual = HUMANO_PLAYER
+    
+        pygame.display.flip()  
+              
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 rodando = False
