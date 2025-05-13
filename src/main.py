@@ -6,6 +6,13 @@ from Captura import Captura
 from MiniMax.__main__ import escolher_movimento_ia
 from MiniMax.config import IA_PLAYER, HUMANO_PLAYER
 
+# paleta de cores 
+# preto licorice (17, 4, 3)
+# fundo (217, 217, 217)
+# jogador azul (1, 151, 246)
+# jogador vermelho (195, 31, 9)
+# borda de seleção (79, 18, 113)
+# borda selecionado (243, 232, 238)
 
 def exibir_imagem(tela):
     imagem = pygame.image.load("./assets/tutorial.jpg")  # Substitua pelo caminho da imagem
@@ -72,7 +79,7 @@ def verificar_fim_de_jogo(configuracao):
 def desenhar_indicador_turno(tela, jogador_atual, fonte):
     """Desenha um indicador mostrando de quem é o turno atual"""
     texto_turno = fonte.render(f"Turno: Jogador {'Vermelho' if jogador_atual == 'v' else 'Azul'}", True, 
-                              (219, 55, 99) if jogador_atual == 'v' else (89, 19, 209))
+                              (195, 31, 9) if jogador_atual == 'v' else (1, 151, 246))
     tela.blit(texto_turno, (10, 10))  # Posição no canto superior esquerdo
 
 
@@ -211,7 +218,7 @@ def main():
                    and not captura.captura_em_cadeia_ativa:
                    # copia estado lógico (v, b ou -)
                    estado_ia = [list(l) for l in configuracao_inicial]
-                   melhor_jogada, _ = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=3)
+                   melhor_jogada, _ = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=10)
                    if melhor_jogada:
                        (i1, j1), (i2, j2) = melhor_jogada
                        # prepara o movimento na camada de lógica + GUI

@@ -11,8 +11,8 @@ class Tabuleiro:
         self.tela_altura = altura
         self.offset_x = (largura - self.largura) // 2
         self.offset_y = (altura - self.altura) // 2
-        self.cor_fundo = (176, 71, 11)  # Marrom
-        self.cor_linha = (0, 0, 0)  # Preto
+        self.cor_fundo = (94, 71, 49)  # Marrom liver
+        self.cor_linha = (17, 4, 3)  # Preto licorice
         self.cor_celula = cor_celula
 
     def desenhar(self, tela):

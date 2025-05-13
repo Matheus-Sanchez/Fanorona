@@ -1,6 +1,6 @@
 from typing import Tuple
 from .gerador_movimentos import generate_moves
-from .heuristica         import evaluate_state
+from .heuristica import evaluate_state
 from copy import deepcopy
 
 State = list[list[str]]

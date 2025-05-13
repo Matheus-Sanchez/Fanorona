@@ -1,10 +1,18 @@
 import pygame
 
+
+# paleta de cores 
+# preto licorice (17, 4, 3)
+# fundo (217, 217, 217)
+# jogador azul (1, 151, 246)
+# jogador vermelho (195, 31, 9)
+# borda de seleção (79, 18, 113)
+# borda selecionado (243, 232, 238)
 # Cores
-PRETO = (0, 0, 0)
-BRANCO = (255, 255, 255)
-VERMELHO = (219, 55, 99)
-AZUL = (89, 19, 209)
+PRETO = (17, 4, 3)
+BRANCO = (243, 232, 238)
+VERMELHO = (195, 31, 9)
+AZUL = (1, 151, 246)
 
 class Peca:
     def __init__(self, x, y, cor):
