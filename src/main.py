@@ -3,8 +3,11 @@ from Tabuleiro import Tabuleiro
 from Pecas import GerenciadorPecas
 from Movimentacao import Movimentacao
 from Captura import Captura
-from MiniMax.__main__ import escolher_movimento_ia
+from MiniMax.__main__ import alphabeta  # Importar a função alphabeta
+from MiniMax.ia import escolher_movimento_ia
 from MiniMax.config import IA_PLAYER, HUMANO_PLAYER
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 # paleta de cores 
 # preto licorice (17, 4, 3)
@@ -116,6 +119,68 @@ def desenhar_indicador_turno(tela, jogador_atual, fonte):
             # texto_restricao_direcao = fonte.render(f"Não pode mover na direção: {dir_texto}", True, (180, 0, 0))
             # tela.blit(texto_restricao_direcao, (300, 70))
 
+def animacao_carregamento(tela, fonte, mensagem="IA pensando..."):
+    """Exibe uma animação de carregamento na tela."""
+    cores = [(195, 31, 9), (1, 151, 246), (79, 18, 113)]
+    posicoes = [(500, 300), (550, 300), (600, 300)]
+    indice = 0
+    rodando = True
+    while rodando:
+        tela.fill((217, 217, 217))  # Fundo cinza claro
+        texto = fonte.render(mensagem, True, (0, 0, 0))
+        tela.blit(texto, (400, 200))  # Mensagem centralizada acima dos círculos
+
+        # Desenhar círculos piscando
+        for i, pos in enumerate(posicoes):
+            cor = cores[i] if i == indice else (200, 200, 200)
+            pygame.draw.circle(tela, cor, pos, 15)
+        
+        pygame.display.flip()
+        indice = (indice + 1) % len(posicoes)  # Alternar entre os círculos
+        pygame.time.delay(300)  # Atraso para criar o efeito de animação
+
+        # Verificar eventos para sair da animação
+        for evento in pygame.event.get():
+            if evento.type == pygame.USEREVENT:  # Evento personalizado para parar a animação
+                rodando = False
+
+def animar_movimento(tela, movimentacao, origem, destino, cor, delay=500):
+    """
+    Anima o movimento de uma peça no tabuleiro.
+    :param tela: Tela do pygame.
+    :param movimentacao: Objeto Movimentacao para obter posições.
+    :param origem: Tupla (linha, coluna) de onde a peça está se movendo.
+    :param destino: Tupla (linha, coluna) para onde a peça está se movendo.
+    :param cor: Cor da peça para desenhar durante a animação.
+    :param delay: Tempo de atraso em milissegundos para a animação.
+    """
+    linha_origem, coluna_origem = origem
+    linha_destino, coluna_destino = destino
+
+    # Coordenadas iniciais e finais
+    x_origem = movimentacao.tabuleiro_offset_x + coluna_origem * movimentacao.tamanho_celula + movimentacao.tamanho_celula // 2
+    y_origem = movimentacao.tabuleiro_offset_y + linha_origem * movimentacao.tamanho_celula + movimentacao.tamanho_celula // 2
+    x_destino = movimentacao.tabuleiro_offset_x + coluna_destino * movimentacao.tamanho_celula + movimentacao.tamanho_celula // 2
+    y_destino = movimentacao.tabuleiro_offset_y + linha_destino * movimentacao.tamanho_celula + movimentacao.tamanho_celula // 2
+
+    # Número de quadros para a animação
+    passos = 16
+    for i in range(passos + 1):
+        # Interpolação linear para calcular a posição intermediária
+        x_atual = x_origem + (x_destino - x_origem) * i / passos
+        y_atual = y_origem + (y_destino - y_origem) * i / passos
+
+        # Redesenhar o tabuleiro e as peças
+        tela.fill((255, 255, 255))  # Fundo branco
+        movimentacao.captura_ref.tabuleiro.desenhar(tela)
+        movimentacao.gerenciador_pecas.desenhar_pecas(tela)
+
+        # Desenhar a peça em movimento
+        pygame.draw.circle(tela, cor, (int(x_atual), int(y_atual)), movimentacao.tamanho_celula // 3)
+
+        pygame.display.flip()
+        pygame.time.delay(delay // passos)  # Atraso entre os quadros
+
 def main():
     pygame.init()
     largura, altura = 1000, 600
@@ -151,6 +216,7 @@ def main():
     
     # Configurar referências cruzadas
     captura.set_gerenciador_pecas(pecas)
+    captura.set_tabuleiro(tabuleiro)  # Configurar referência ao tabuleiro
     movimentacao.set_captura_ref(captura)
     
     # Inicializar o jogador atual (v = vermelho começa)
@@ -192,7 +258,7 @@ def main():
             desenhar_indicador_turno(tela, jogador_atual, fonte)
             
             # # Mostrar indicador de captura em cadeia se ativo
-            # if captura.captura_em_cadeia_ativa:
+            # if captura.captura_em_cadeia:
             #     desenhar_indicador_captura_cadeia(tela, 
             #                                    captura.captura_em_cadeia_ativa, 
             #                                    fonte, 
@@ -213,30 +279,56 @@ def main():
 
         
         if modo_ia and mensagem_vencedor is None \
-                   and jogador_atual == IA_PLAYER \
-                   and not captura.escolha_captura_ativa \
-                   and not captura.captura_em_cadeia_ativa:
-                   # copia estado lógico (v, b ou -)
-                   estado_ia = [list(l) for l in configuracao_inicial]
-                   melhor_jogada, _ = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=10)
-                   if melhor_jogada:
-                       (i1, j1), (i2, j2) = melhor_jogada
-                       # prepara o movimento na camada de lógica + GUI
-                       movimentacao.peca_selecionada = (i1, j1)
-                       movimentacao.movimentos_possiveis = [(i2, j2)]
-                       movimentacao.mover_peca(i2, j2, IA_PLAYER)
-                       movimentacao.limpar_selecao()  # evita peças "presas" selecionadas
-                       # troca turno se não houver cadeia de captura
-                       if not captura.captura_em_cadeia_ativa \
-                          and not captura.escolha_captura_ativa:
-                           jogador_atual = HUMANO_PLAYER
-                   else:
-                       # sem jogadas possíveis → declare fim ou passe o turno
-                       resultado = verificar_fim_de_jogo(configuracao_inicial)
-                       if resultado:
-                           mensagem_vencedor = resultado
-                       else:
-                           jogador_atual = HUMANO_PLAYER
+           and jogador_atual == IA_PLAYER \
+           and not captura.escolha_captura_ativa \
+           and not captura.captura_em_cadeia_ativa:
+            while True:  # Loop to handle chain captures
+                # Exibir animação de carregamento em uma thread separada
+                pygame.time.set_timer(pygame.USEREVENT, 0)  # Garantir que o evento não seja disparado antes
+                threading.Thread(target=animacao_carregamento, args=(tela, fonte)).start()
+
+                # Copiar estado lógico (v, b ou -)
+                estado_ia = [list(l) for l in configuracao_inicial]
+                print("IA está avaliando o estado atual...")  # Atualização no terminal
+
+                melhor_jogada = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=4, alphabeta_func=alphabeta)
+
+                # Parar a animação de carregamento
+                pygame.event.post(pygame.event.Event(pygame.USEREVENT))  # Enviar evento para parar a animação
+
+                if melhor_jogada:
+                    (i1, j1), (i2, j2) = melhor_jogada
+                    print(f"IA escolheu mover de ({i1}, {j1}) para ({i2}, {j2}).")  # Atualização no terminal
+
+                    # Animação do movimento da IA
+                    cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
+                    animar_movimento(tela, movimentacao, (i1, j1), (i2, j2), cor_peca)
+
+                    # Preparar o movimento na camada de lógica + GUI
+                    movimentacao.peca_selecionada = (i1, j1)
+                    movimentacao.movimentos_possiveis = [(i2, j2)]
+                    movimentacao.mover_peca(i2, j2, IA_PLAYER)
+                    movimentacao.limpar_selecao()  # Evita peças "presas" selecionadas
+
+                    # Atualizar a configuração inicial para refletir o movimento
+                    configuracao_inicial[i1][j1] = "-"
+                    configuracao_inicial[i2][j2] = IA_PLAYER
+
+                    # Verificar se há uma captura em cadeia disponível
+                    if captura.existe_captura_geral(IA_PLAYER, (i2, j2)):
+                        print("IA encontrou uma captura em cadeia. Continuando...")
+                        continue  # Continuar o loop para realizar a captura em cadeia
+                    else:
+                        break  # Sair do loop se não houver mais capturas em cadeia
+                else:
+                    # Sem jogadas possíveis → declare fim ou passe o turno
+                    resultado = verificar_fim_de_jogo(configuracao_inicial)
+                    if resultado:
+                        mensagem_vencedor = resultado
+                    break  # Sair do loop se não houver jogadas possíveis
+
+            # Trocar turno para o jogador humano
+            jogador_atual = HUMANO_PLAYER
     
         pygame.display.flip()  
               
@@ -248,20 +340,11 @@ def main():
                     x, y = evento.pos
                     if captura.escolha_captura_ativa:
                         if captura.processar_clique_botoes(x, y):
-                            # Se não estiver em uma captura em cadeia, troca o turno
                             if not captura.captura_em_cadeia_ativa:
                                 jogador_atual = "b" if jogador_atual == "v" else "v"
                     else:
-                        # Processar clique no tabuleiro
                         movimento_realizado = movimentacao.processar_clique(x, y, jogador_atual)
-
-                        # Trocar turno apenas se:
-                        # 1. Houve movimento concluído
-                        # 2. Não há captura em cadeia ativa
-                        # 3. Não há escolha de captura aguardando decisão
-                        if movimento_realizado \
-                           and not captura.captura_em_cadeia_ativa \
-                           and not captura.escolha_captura_ativa:
+                        if movimento_realizado and not captura.captura_em_cadeia_ativa and not captura.escolha_captura_ativa:
                             jogador_atual = "b" if jogador_atual == "v" else "v"
                         elif evento.type == pygame.KEYDOWN:
                             movimentacao.processar_eventos(evento)
