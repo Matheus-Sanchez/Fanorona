@@ -79,11 +79,23 @@ def verificar_fim_de_jogo(configuracao):
         return "Jogador V venceu!"
     return None
 
-def desenhar_indicador_turno(tela, jogador_atual, fonte):
-    """Desenha um indicador mostrando de quem é o turno atual"""
-    texto_turno = fonte.render(f"Turno: Jogador {'Vermelho' if jogador_atual == 'v' else 'Azul'}", True, 
-                              (195, 31, 9) if jogador_atual == 'v' else (1, 151, 246))
-    tela.blit(texto_turno, (10, 10))  # Posição no canto superior esquerdo
+# --- Substituir o indicador de turno ---
+def desenhar_indicador_turno(tela, jogador_atual, fonte, ia_pensando, ia_frame):
+    cor = (195, 31, 9) if jogador_atual == 'v' else (1, 151, 246)
+    texto = "IA pensando..." if modo_ia and jogador_atual == IA_PLAYER and ia_pensando else \
+            f"Turno: Jogador {'Vermelho' if jogador_atual == 'v' else 'Azul'}"
+    texto_turno = fonte.render(texto, True, cor)
+    tela.blit(texto_turno, (10, 10))
+
+    if jogador_atual == IA_PLAYER and ia_pensando:
+        base_x = texto_turno.get_width() + 20
+        for i in range(3):
+            raio = 4
+            x = 10 + base_x + i * 20
+            y = 10 + texto_turno.get_height() // 2
+            ativo = (ia_frame // 10) % 3 == i
+            cor_ponto = cor if ativo else (180, 180, 180)
+            pygame.draw.circle(tela, cor_ponto, (x, y), raio)
 
 
 # def desenhar_indicador_captura_cadeia(tela, captura_em_cadeia_ativa, fonte, posicoes_visitadas, ultima_direcao):
@@ -119,30 +131,6 @@ def desenhar_indicador_turno(tela, jogador_atual, fonte):
             # texto_restricao_direcao = fonte.render(f"Não pode mover na direção: {dir_texto}", True, (180, 0, 0))
             # tela.blit(texto_restricao_direcao, (300, 70))
 
-def animacao_carregamento(tela, fonte, mensagem="IA pensando..."):
-    """Exibe uma animação de carregamento na tela."""
-    cores = [(195, 31, 9), (1, 151, 246), (79, 18, 113)]
-    posicoes = [(500, 300), (550, 300), (600, 300)]
-    indice = 0
-    rodando = True
-    while rodando:
-        tela.fill((217, 217, 217))  # Fundo cinza claro
-        texto = fonte.render(mensagem, True, (0, 0, 0))
-        tela.blit(texto, (400, 200))  # Mensagem centralizada acima dos círculos
-
-        # Desenhar círculos piscando
-        for i, pos in enumerate(posicoes):
-            cor = cores[i] if i == indice else (200, 200, 200)
-            pygame.draw.circle(tela, cor, pos, 15)
-        
-        pygame.display.flip()
-        indice = (indice + 1) % len(posicoes)  # Alternar entre os círculos
-        pygame.time.delay(300)  # Atraso para criar o efeito de animação
-
-        # Verificar eventos para sair da animação
-        for evento in pygame.event.get():
-            if evento.type == pygame.USEREVENT:  # Evento personalizado para parar a animação
-                rodando = False
 
 def animar_movimento(tela, movimentacao, origem, destino, cor, delay=500):
     """
@@ -189,6 +177,9 @@ def main():
     fonte = pygame.font.Font(None, 36)
     fonte_grande = pygame.font.Font(None, 50)
     
+    global modo_ia # Adicionar para que desenhar_indicador_turno possa acessá-lo
+    modo_ia = False # Inicializar modo_ia
+
     while True:
         escolha = menu_inicial(tela)
         if escolha == "imagem":
@@ -224,6 +215,8 @@ def main():
     
     mensagem_vencedor = None
     rodando = True
+    ia_pensando = False  # Inicializar ia_pensando
+    ia_frame = 0 # Inicializar ia_frame
     while rodando:
         tela.fill((255, 255, 255))
         tabuleiro.desenhar(tela)
@@ -255,7 +248,7 @@ def main():
         
         # Mostrar indicador de turno
         if not mensagem_vencedor:
-            desenhar_indicador_turno(tela, jogador_atual, fonte)
+            desenhar_indicador_turno(tela, jogador_atual, fonte, ia_pensando, ia_frame)
             
             # # Mostrar indicador de captura em cadeia se ativo
             # if captura.captura_em_cadeia:
@@ -270,70 +263,92 @@ def main():
             resultado = verificar_fim_de_jogo(configuracao_inicial)
             if resultado:
                 mensagem_vencedor = resultado
-        
+                print(f"Fim de jogo: {mensagem_vencedor}")  # Debug
+
         # Mostrar mensagem de vencedor
         if mensagem_vencedor:
             texto_vencedor = fonte_grande.render(mensagem_vencedor, True, (255, 0, 0))
             tela.blit(texto_vencedor, (largura // 2 - texto_vencedor.get_width() // 2, 20))
-        
+            pygame.display.flip()
+            pygame.time.delay(3000)  # Esperar 3 segundos antes de encerrar
+            rodando = False  # Encerrar o jogo após exibir a mensagem
+            continue  # Sair do loop atual para evitar mais lógica
 
-        
         if modo_ia and mensagem_vencedor is None \
            and jogador_atual == IA_PLAYER \
            and not captura.escolha_captura_ativa \
            and not captura.captura_em_cadeia_ativa:
-            while True:  # Loop to handle chain captures
-                # Exibir animação de carregamento em uma thread separada
-                pygame.time.set_timer(pygame.USEREVENT, 0)  # Garantir que o evento não seja disparado antes
-                threading.Thread(target=animacao_carregamento, args=(tela, fonte)).start()
+            ia_pensando = True  # IA começa a pensar
 
-                # Copiar estado lógico (v, b ou -)
-                estado_ia = [list(l) for l in configuracao_inicial]
-                print("IA está avaliando o estado atual...")  # Atualização no terminal
+            # Mostrar "IA pensando..." com animação antes de calcular a jogada
+            for _ in range(30):  # Exibir animação por um curto período
+                tela.fill((255, 255, 255))
+                tabuleiro.desenhar(tela)
+                pecas.desenhar_pecas(tela)
+                movimentacao.desenhar_movimentos(tela)
+                if movimentacao.captura_ref and movimentacao.existe_captura_geral(jogador_atual):
+                    movimentacao.destacar_pecas_com_captura(tela, jogador_atual)
+                if movimentacao.peca_selecionada:
+                    movimentacao.desenhar_borda_selecao(tela)
+                if captura.escolha_captura_ativa:
+                    captura.desenhar_botoes_captura(tela)
+                if captura.captura_em_cadeia_ativa and captura.posicoes_visitadas:
+                    for posicao in captura.posicoes_visitadas:
+                        linha, coluna = posicao
+                        pos_x = captura.offset_x + (coluna * captura.tamanho_celula) + captura.tamanho_celula // 2
+                        pos_y = captura.offset_y + (linha * captura.tamanho_celula) + captura.tamanho_celula // 2
+                        pygame.draw.circle(tela, (100, 100, 100, 128), (pos_x, pos_y), 10)
+                desenhar_indicador_turno(tela, jogador_atual, fonte, ia_pensando, ia_frame)
+                pygame.display.flip()
+                ia_frame += 1
+                pygame.time.delay(100)  # Pequeno atraso para a animação
 
-                melhor_jogada = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=4, alphabeta_func=alphabeta)
+            # Calcular a jogada da IA
+            estado_ia = [list(l) for l in configuracao_inicial]
+            print("IA está avaliando o estado atual...")  # Debug
 
-                # Parar a animação de carregamento
-                pygame.event.post(pygame.event.Event(pygame.USEREVENT))  # Enviar evento para parar a animação
+            melhor_jogada = escolher_movimento_ia(estado_ia, IA_PLAYER, profundidade=4, alphabeta_func=alphabeta)
 
-                if melhor_jogada:
-                    (i1, j1), (i2, j2) = melhor_jogada
-                    print(f"IA escolheu mover de ({i1}, {j1}) para ({i2}, {j2}).")  # Atualização no terminal
+            ia_pensando = False  # IA terminou de pensar
 
-                    # Animação do movimento da IA
-                    cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
-                    animar_movimento(tela, movimentacao, (i1, j1), (i2, j2), cor_peca)
+            if melhor_jogada:
+                (i1, j1), (i2, j2) = melhor_jogada
+                print(f"IA escolheu mover de ({i1}, {j1}) para ({i2}, {j2}).")  # Debug
 
-                    # Preparar o movimento na camada de lógica + GUI
-                    movimentacao.peca_selecionada = (i1, j1)
-                    movimentacao.movimentos_possiveis = [(i2, j2)]
-                    movimentacao.mover_peca(i2, j2, IA_PLAYER)
-                    movimentacao.limpar_selecao()  # Evita peças "presas" selecionadas
+                # Animação do movimento da IA
+                cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
+                animar_movimento(tela, movimentacao, (i1, j1), (i2, j2), cor_peca)
 
-                    # Atualizar a configuração inicial para refletir o movimento
-                    configuracao_inicial[i1][j1] = "-"
-                    configuracao_inicial[i2][j2] = IA_PLAYER
+                # Preparar o movimento na camada de lógica + GUI
+                movimentacao.peca_selecionada = (i1, j1)
+                movimentacao.movimentos_possiveis = [(i2, j2)]
+                movimentacao.mover_peca(i2, j2, IA_PLAYER)
+                movimentacao.limpar_selecao()  # Evita peças "presas" selecionadas
 
-                    # Verificar se há uma captura em cadeia disponível
-                    if captura.existe_captura_geral(IA_PLAYER, (i2, j2)):
-                        print("IA encontrou uma captura em cadeia. Continuando...")
-                        continue  # Continuar o loop para realizar a captura em cadeia
-                    else:
-                        break  # Sair do loop se não houver mais capturas em cadeia
+                # Atualizar a configuração inicial para refletir o movimento
+                configuracao_inicial[i1][j1] = "-"
+                configuracao_inicial[i2][j2] = IA_PLAYER
+
+                # Verificar se há uma captura em cadeia disponível
+                if captura.existe_captura_geral(IA_PLAYER, (i2, j2)):
+                    print("IA encontrou uma captura em cadeia. Continuando...")
+                    continue  # Continuar o loop para realizar a captura em cadeia
                 else:
-                    # Sem jogadas possíveis → declare fim ou passe o turno
-                    resultado = verificar_fim_de_jogo(configuracao_inicial)
-                    if resultado:
-                        mensagem_vencedor = resultado
-                    break  # Sair do loop se não houver jogadas possíveis
+                    print("IA terminou sua jogada.")  # Debug
+            else:
+                print("IA não encontrou jogadas possíveis.")  # Debug
 
             # Trocar turno para o jogador humano
             jogador_atual = HUMANO_PLAYER
-    
-        pygame.display.flip()  
-              
+            print(f"Turno do jogador humano: {jogador_atual}")  # Debug
+
+        pygame.display.flip()
+        ia_frame += 1  # Incrementar para animação dos pontos
+
+        # Verificar eventos
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                print("Jogo encerrado pelo usuário.")  # Debug
                 rodando = False
             elif not mensagem_vencedor:  # Bloqueia interação após o fim do jogo
                 if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -342,13 +357,16 @@ def main():
                         if captura.processar_clique_botoes(x, y):
                             if not captura.captura_em_cadeia_ativa:
                                 jogador_atual = "b" if jogador_atual == "v" else "v"
+                                print(f"Turno trocado para: {jogador_atual}")  # Debug
                     else:
                         movimento_realizado = movimentacao.processar_clique(x, y, jogador_atual)
                         if movimento_realizado and not captura.captura_em_cadeia_ativa and not captura.escolha_captura_ativa:
                             jogador_atual = "b" if jogador_atual == "v" else "v"
+                            print(f"Turno trocado para: {jogador_atual}")  # Debug
                         elif evento.type == pygame.KEYDOWN:
                             movimentacao.processar_eventos(evento)
-                
+
+    print("Jogo encerrado.")  # Debug
     pygame.quit()
 
 if __name__ == "__main__":

@@ -55,15 +55,13 @@ def escolher_movimento_ia(state: State, player: str, profundidade: int, alphabet
         return None
 
     for move in moves_to_evaluate:
-        state_after_first_part = aplicar_movimento(state, move, player)
+        # Unpack the tuple from aplicar_movimento
+        state_after_first_part, _ = aplicar_movimento(state, move, player)
         active_piece_after_first_part = move[1]
         
         current_path_for_chain_simulation = []
         if chain_capture_context: # Check if context is still valid (wasn't cleared by warning)
-            # Ensure the move being processed is indeed from the active_piece of the context
-            # This check is vital if the above fallback wasn't taken.
             if move[0] != chain_capture_context['active_piece_pos']:
-                # This should only happen if generate_moves failed to respect active_piece_pos
                 print(f"CRITICAL ERROR in IA: Move {move} does not originate from active_piece {chain_capture_context['active_piece_pos']} during a chain.")
                 print(f"Moves evaluated were: {moves_to_evaluate}")
                 # This indicates a deeper bug, possibly in generate_moves or context handling.
@@ -104,27 +102,36 @@ def escolher_movimento_ia(state: State, player: str, profundidade: int, alphabet
     return current_best_move
 
 # Helper function for ia.py, similar to the one in alpha_beta.py
-def _get_all_final_states_after_chain_for_ia(current_s: State, player_for_chain: str, piece_at: Tuple[int, int], 
-                                             visited_path: List[Tuple[int, int]]) -> List[State]:
-    if current_s is None:
-        # This is unexpected and indicates an issue upstream
-        # For now, return an empty list to prevent further errors, but this needs investigation
-        print(f"Error: _get_all_final_states_after_chain_for_ia received current_s as None. piece_at: {piece_at}, visited_path: {visited_path}")
-        return [] # Or raise an exception
+def _get_all_final_states_after_chain_for_ia(state, player, piece_pos, visited_path, depth=0, max_depth=50):
+    """
+    Recursive function to get all final states after a chain of captures for the AI.
+    :param state: Current state of the board.
+    :param player: Current player ('v' or 'b').
+    :param piece_pos: Position of the piece being moved.
+    :param visited_path: List of positions already visited in the chain.
+    :param depth: Current recursion depth.
+    :param max_depth: Maximum allowed recursion depth.
+    """
+    if depth > max_depth:
+        print(f"Max recursion depth reached at depth {depth} with piece_pos {piece_pos}")
+        return []  # Stop recursion if depth exceeds the limit
 
-    chain_moves = generate_moves(current_s, player_for_chain,
-                                 capturas_apenas=True,
-                                 active_piece_pos=piece_at,
-                                 visited_in_chain=visited_path)
+    # Base case: No more valid moves
+    chain_moves = generate_moves(state, player, piece_pos, visited_path)
     if not chain_moves:
-        return [current_s]
+        return [state]  # Return the current state as a final state
 
-    all_resulting_states: List[State] = []
-    for chain_m in chain_moves:
-        state_after_chain_m = aplicar_movimento(current_s, chain_m, player_for_chain)
-        new_piece_pos = chain_m[1]
-        new_visited_path = visited_path + [new_piece_pos]
-        all_resulting_states.extend(
-            _get_all_final_states_after_chain_for_ia(state_after_chain_m, player_for_chain, new_piece_pos, new_visited_path)
+    final_states = []
+    for move in chain_moves:
+        new_state = aplicar_movimento(state, move, player)  # Apply the move to get a new state
+        new_piece_pos = move[1]
+        new_visited_path = visited_path + [piece_pos]
+
+        # Recursive call with increased depth
+        final_states.extend(
+            _get_all_final_states_after_chain_for_ia(
+                new_state, player, new_piece_pos, new_visited_path, depth + 1, max_depth
+            )
         )
-    return all_resulting_states if all_resulting_states else [current_s]
+
+    return final_states if final_states else [state]
