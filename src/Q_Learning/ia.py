@@ -1,27 +1,25 @@
-# src/Q-Learning/ia.py
-
-from .agent import QLearningAgent
-# CORREÇÃO: A importação correta é generate_moves, não aplicar_movimento.
-from MiniMax.gerador_movimentos import generate_moves
 import os
+from .agent import QLearningAgent
+from .environment import FanoronaEnv
 
 # Instancia global do agente para não precisar carregar o arquivo toda vez
+env = FanoronaEnv()
+initial_state = env.reset()
+# ações no Fanorona: pares de coordenadas (origem, destino)
+legal = env.get_legal_actions(initial_state, env.current_player)
+# Cria agente SEM passar action_dim
 q_agent = QLearningAgent()
 
-# Define o caminho padrão para o modelo
-caminho_modelo_padrao = os.path.join("Q-Learning", "modelos", "qlearning_policy.pkl")
-q_agent.load_policy(caminho_modelo_padrao) # Carrega a política uma vez quando o módulo é importado
+# carrega política existente (se houver)
+caminho_modelo_padrao = os.path.join('Q-Learning', 'modelos', 'qlearning_policy.pkl')
+q_agent.load_policy(caminho_modelo_padrao)
 
-def escolher_movimento_qlearning(state, player):
+def escolher_movimento_qlearning(state, legal_actions):
     """
-    Função chamada pelo `main.py` para obter a jogada da IA.
-    Usa a política aprendida sem exploração.
+    Retorna a ação escolhida pelo Q-Learning agent para um dado estado e conjunto de ações.
+    state: lista de listas que representa o tabuleiro
+    legal_actions: lista de ações (cada ação é [(r1,c1),(r2,c2)])
     """
-    # CORREÇÃO: Usa a função correta para obter a lista de movimentos.
-    legal_actions = generate_moves(state, player)
-    
-    if not legal_actions:
-        return None
-        
-    # Chama choose_action com is_training=False para garantir que ele use a melhor jogada
-    return q_agent.choose_action(state, legal_actions, is_training=False)
+    # o agente espera listas de coordenadas como ações
+    move = q_agent.choose_action(state, legal_actions, is_training=True)
+    return move

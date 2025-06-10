@@ -1,4 +1,3 @@
-
 import os
 import time
 import threading
@@ -13,13 +12,13 @@ MODELO_DIR = os.path.join(os.path.dirname(__file__), "modelos")
 os.makedirs(MODELO_DIR, exist_ok=True)
 
 # Hiperparâmetros
-NUM_EPISODIOS = 200000
+NUM_EPISODIOS = 200
 ALFA = 0.01
 GAMMA = 0.99
 EPSILON = 1.0
 MIN_EPSILON = 0.01
 DECAY_RATE = 0.9995
-CHECKPOINT_INTERVAL = 10000
+CHECKPOINT_INTERVAL = 100
 STATS_UPDATE_INTERVAL = 100
 WINDOW = 500
 
@@ -29,8 +28,17 @@ def async_save(agent, file_path):
 
 def train_agent():
     env = FanoronaEnv()
-    # Usa os nomes de parâmetros corretos do construtor do agente
-    agent = QLearningAgent(gamma=GAMMA, alpha=ALFA, epsilon=EPSILON)
+    # pega estado inicial para contar ações legais
+    initial_state = env.reset()
+    state_dim = len(initial_state) * len(initial_state[0])
+    # número real de ações no estado inicial
+    action_dim = len(env.get_legal_actions(initial_state, env.current_player))
+    agent = QLearningAgent(
+                           gamma=GAMMA,
+                           alpha=ALFA,
+                           epsilon=EPSILON,
+                           min_e=MIN_EPSILON,
+                           decay=DECAY_RATE)
 
     caminho_modelo = os.path.join(MODELO_DIR, "qlearning_policy.pkl")
     if os.path.exists(caminho_modelo):
@@ -65,9 +73,9 @@ def train_agent():
 
             action = None
             if current_player == q_agent_player:
-                action = agent.choose_action(state_list, legal_actions)
+                action = agent.choose_action(state_list, legal_actions, is_training=True)
             else: # Minimax
-                action = escolher_movimento_ia(state_list, current_player, depth=5) # Profundidade 2 para acelerar
+                action = escolher_movimento_ia(state_list, current_player, depth=6) # Profundidade 2 para acelerar
 
             if action is None: # Se a IA não escolheu (ou não pôde escolher)
                 done = True
@@ -80,7 +88,7 @@ def train_agent():
             if current_player == q_agent_player:
                 next_legal_actions = env.get_legal_actions(next_state, opponent_player)
                 # CORREÇÃO: Chama o método 'update' com os argumentos corretos
-                agent.update(state_list, action, reward, next_state, next_legal_actions)
+                agent.learn(state_list, action, reward, next_state, done)
                 reward_acumulado += reward
 
             state = next_state
