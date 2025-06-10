@@ -15,3 +15,4 @@ HUMANO_PLAYER = "b"
 # Valor de avaliação extrema (pode ser usado para fim de jogo)
 INFINITY = float("inf")
 NEG_INFINITY = float("-inf")
+

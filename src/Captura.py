@@ -12,6 +12,7 @@ class Captura:
         self.pecas = None  # Referência para o gerenciador de peças
         self.captura_em_cadeia_ativa = False  # Indica se uma cadeia de capturas está em andamento
         self.posicao_ultima_peca = None  # Armazena a posição da última peça movida em uma cadeia
+        self.tabuleiro = None  # Referência para o tabuleiro (adicionado)
         
         # Novas variáveis para controlar as restrições de movimento
         self.posicoes_visitadas = []  # Lista de posições visitadas durante uma captura em cadeia
@@ -21,6 +22,10 @@ class Captura:
         """Define a referência para o gerenciador de peças"""
         self.pecas = gerenciador_pecas
     
+    def set_tabuleiro(self, tabuleiro):
+        """Define a referência para o objeto Tabuleiro."""
+        self.tabuleiro = tabuleiro
+
     def capturar_pecas(self, linha_atual, coluna_atual, nova_linha, nova_coluna, configuracao_inicial, tela):
         direcao_linha = nova_linha - linha_atual
         direcao_coluna = nova_coluna - coluna_atual
@@ -289,3 +294,44 @@ class Captura:
                     return True
         
         return False
+
+    def existe_captura_geral(self, jogador, posicao=None):
+        """
+        Verifica se há capturas disponíveis para o jogador.
+        :param jogador: 'v' para vermelho ou 'b' para azul.
+        :param posicao: (linha, coluna) opcional para verificar capturas de uma peça específica.
+        :return: True se houver capturas disponíveis, False caso contrário.
+        """
+        direcoes = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+        if posicao:
+            linhas, colunas = [posicao[0]], [posicao[1]]
+        else:
+            linhas, colunas = range(self.linhas), range(self.colunas)
+
+        for linha in linhas:
+            for coluna in colunas:
+                if self.configuracao_inicial[linha][coluna] == jogador: # Changed self.configuracao to self.configuracao_inicial
+                    for d_linha, d_coluna in direcoes:
+                        l_alvo, c_alvo = linha + d_linha, coluna + d_coluna
+                        l_captura, c_captura = linha + 2 * d_linha, coluna + 2 * d_coluna
+                        if (
+                            0 <= l_alvo < self.linhas and 0 <= c_alvo < self.colunas and
+                            0 <= l_captura < self.linhas and 0 <= c_captura < self.colunas and
+                            self.configuracao_inicial[l_alvo][c_alvo] not in (jogador, "-") and # Changed self.configuracao to self.configuracao_inicial
+                            self.configuracao_inicial[l_captura][c_captura] == "-" # Changed self.configuracao to self.configuracao_inicial
+                        ):
+                            return True
+        return False
+
+    def finalizar_cadeia_captura(self):
+        """Reseta o estado de captura em cadeia e seleção de peça."""
+        self.captura_em_cadeia_ativa = False
+        self.escolha_captura_ativa = False
+        self.posicoes_visitadas = []
+        self.ultima_direcao = None
+        self.posicao_ultima_peca = None
+        self.pecas_para_captura_aproximacao = []
+        self.pecas_para_captura_afastamento = []
+        self.dados_captura_ambigua = None
+        if hasattr(self, "movimentacao_ref") and self.movimentacao_ref:
+            self.movimentacao_ref.limpar_selecao()
