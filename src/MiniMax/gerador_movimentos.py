@@ -8,7 +8,8 @@ State = List[List[str]]
 Position = Tuple[int, int]
 Move = List[Position]  # Um movimento é um caminho: [(origem), (destino1), (destino2), ...]
 
-DIRECTIONS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+DIRECTIONS_8 = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+DIRECTIONS_4 = [(-1, 0), (0, -1), (0, 1), (1, 0)]
 
 def is_valid_pos(lin: int, col: int) -> bool:
     """Verifica se uma posição (lin, col) está dentro dos limites do tabuleiro 5x9."""
@@ -17,6 +18,12 @@ def is_valid_pos(lin: int, col: int) -> bool:
 def is_strong_intersection(lin: int, col: int) -> bool:
     """Verifica se uma interseção é forte (permite movimentos diagonais)."""
     return (lin + col) % 2 == 0
+
+def is_valid_direction(lin, col, d_lin, d_col):
+    if (lin % 2 == col % 2):
+        return (d_lin, d_col) in DIRECTIONS_8
+    else:
+        return (d_lin, d_col) in DIRECTIONS_4
 
 def aplicar_movimento(state: State, move: Move, player: str) -> Tuple[State, List[Position]]:
     new_state = deepcopy(state)
@@ -57,7 +64,7 @@ def _get_capture_continuations(state: State, player: str, piece_pos: Position, v
     continuations = []
     opponent = 'b' if player == 'v' else 'v'
     
-    possible_directions = DIRECTIONS if is_strong_intersection(*piece_pos) else DIRECTIONS[1::2]
+    possible_directions = DIRECTIONS_8 if is_strong_intersection(*piece_pos) else DIRECTIONS_4
 
     for d_lin, d_col in possible_directions:
         current_direction = (d_lin, d_col)
@@ -104,7 +111,17 @@ def generate_moves(state: State, player: str) -> List[Move]:
             if state[r][c] == player:
                 continuations = _get_capture_continuations(state, player, (r, c), [(r,c)], (0,0))
                 for chain in continuations:
-                    capture_moves.append([(r,c)] + chain)
+                    # Só aceita cadeias cujos movimentos respeitam as direções válidas
+                    valido = True
+                    caminho = [(r, c)] + chain
+                    for i in range(len(caminho) - 1):
+                        dx = caminho[i+1][0] - caminho[i][0]
+                        dy = caminho[i+1][1] - caminho[i][1]
+                        if not is_valid_direction(caminho[i][0], caminho[i][1], dx, dy):
+                            valido = False
+                            break
+                    if valido:
+                        capture_moves.append(caminho)
 
     # 2. Se houver movimentos de captura, retorne-os
     if capture_moves:
@@ -115,7 +132,7 @@ def generate_moves(state: State, player: str) -> List[Move]:
     for r in range(5):
         for c in range(9):
             if state[r][c] == player:
-                possible_directions = DIRECTIONS if is_strong_intersection(r, c) else DIRECTIONS[1::2]
+                possible_directions = DIRECTIONS_8 if (r % 2 == c % 2) else DIRECTIONS_4
                 for d_lin, d_col in possible_directions:
                     target_pos = (r + d_lin, c + d_col)
                     if is_valid_pos(*target_pos) and state[target_pos[0]][target_pos[1]] == '-':
@@ -129,31 +146,23 @@ def aplicar_movimento(state: State, move_sequence: Move, player: str) -> Tuple[S
     Aplica um movimento (que pode ser uma cadeia) a um estado do tabuleiro.
     Retorna o novo estado e uma lista de peças capturadas.
     """
+    from copy import deepcopy
     new_state = deepcopy(state)
     opponent = 'b' if player == 'v' else 'v'
     total_captured_pieces = []
 
-    # Um movimento é uma lista de posições, ex: [(r1,c1), (r2,c2), (r3,c3)]
-    # Iteramos sobre os segmentos do caminho, ex: (r1,c1)->(r2,c2), depois (r2,c2)->(r3,c3)
     for i in range(len(move_sequence) - 1):
-        src = move_sequence[i]  # CORRIGIDO: era current_piece_pos
+        src = move_sequence[i]
         dst = move_sequence[i+1]
 
-        # --- NOVO: Só permite movimento se a direção for válida para a casa de origem ---
         linha, coluna = src
-        if linha % 2 == coluna % 2:
-            direcoes_validas = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-        else:
-            direcoes_validas = [(-1, 0), (0, -1), (0, 1), (1, 0)]
         dx = dst[0] - src[0]
         dy = dst[1] - src[1]
-        if (dx, dy) not in direcoes_validas:
+        # Só permite movimento se a direção for válida para a casa de origem
+        if not is_valid_direction(linha, coluna, dx, dy):
             # Movimento inválido para esta casa, ignore ou retorne estado inalterado
-            # print(f"Movimento inválido para casa ({linha},{coluna}): direção ({dx},{dy})")
             return new_state, total_captured_pieces
-        # --- FIM DA CORREÇÃO ---
 
-        # Mover a peça
         piece_to_move = new_state[src[0]][src[1]]
         if piece_to_move != player:
             return new_state, total_captured_pieces
