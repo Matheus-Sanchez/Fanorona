@@ -260,14 +260,11 @@ def main():
                 print("IA está avaliando o estado atual...")  # Debug
 
                 melhor_jogada = escolher_movimento_ia(estado_ia, IA_PLAYER, depth)
-
                 ia_pensando = False  # IA terminou de pensar
 
                 if melhor_jogada:
                     print(f"IA escolheu o movimento: {melhor_jogada}")
                     cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
-                    
-                    # Para cada segmento do movimento da IA, anima e aplica usando a lógica do jogo
                     for i in range(len(melhor_jogada) - 1):
                         origem = melhor_jogada[i]
                         destino = melhor_jogada[i+1]
@@ -275,15 +272,40 @@ def main():
                         movimentacao.peca_selecionada = origem
                         movimentacao.movimentos_possiveis = [destino]
                         movimentacao.mover_peca(destino[0], destino[1], IA_PLAYER)
-                        # Não limpe a seleção aqui, pois pode haver cadeia
-
-                    # Após toda a sequência, limpe seleção e finalize cadeia se necessário
                     movimentacao.limpar_selecao()
                     if captura.captura_em_cadeia_ativa or captura.escolha_captura_ativa:
                         captura.finalizar_cadeia_captura()
-
                     jogador_atual = HUMANO_PLAYER
                     print(f"Turno do jogador humano: {jogador_atual}")
+                else:
+                    # Verifica se realmente não há nenhum movimento possível para a IA
+                    from MiniMax.gerador_movimentos import generate_moves
+                    movimentos_possiveis = generate_moves(estado_ia, IA_PLAYER)
+                    if movimentos_possiveis:
+                        # Força a IA a jogar o primeiro movimento possível
+                        print("IA não encontrou jogada ótima, mas ainda há movimentos possíveis. Forçando o primeiro movimento legal.")
+                        melhor_jogada = movimentos_possiveis[0]
+                        cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
+                        for i in range(len(melhor_jogada) - 1):
+                            origem = melhor_jogada[i]
+                            destino = melhor_jogada[i+1]
+                            animar_movimento(tela, movimentacao, origem, destino, cor_peca, tabuleiro, pecas)
+                            movimentacao.peca_selecionada = origem
+                            movimentacao.movimentos_possiveis = [destino]
+                            movimentacao.mover_peca(destino[0], destino[1], IA_PLAYER)
+                        movimentacao.limpar_selecao()
+                        if captura.captura_em_cadeia_ativa or captura.escolha_captura_ativa:
+                            captura.finalizar_cadeia_captura()
+                        jogador_atual = HUMANO_PLAYER
+                        print(f"Turno do jogador humano: {jogador_atual}")
+                    else:
+                        print("IA não encontrou jogadas possíveis.")
+                        mensagem_vencedor = "Jogador Humano venceu! (IA ficou sem movimentos)"
+                        print(f"Fim de jogo: {mensagem_vencedor}")
+                        pygame.display.flip()
+                        pygame.time.delay(3000)
+                        rodando = False
+                        continue
 
             # Trocar turno para o jogador humano
             jogador_atual = HUMANO_PLAYER

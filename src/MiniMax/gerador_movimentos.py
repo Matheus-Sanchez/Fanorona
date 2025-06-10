@@ -124,7 +124,7 @@ def generate_moves(state: State, player: str) -> List[Move]:
     return non_capture_moves
 
 
-def aplicar_movimento(state: State, move: Move, player: str) -> Tuple[State, List[Position]]:
+def aplicar_movimento(state: State, move_sequence: Move, player: str) -> Tuple[State, List[Tuple[int, int]]]:
     """
     Aplica um movimento (que pode ser uma cadeia) a um estado do tabuleiro.
     Retorna o novo estado e uma lista de peças capturadas.
@@ -135,34 +135,56 @@ def aplicar_movimento(state: State, move: Move, player: str) -> Tuple[State, Lis
 
     # Um movimento é uma lista de posições, ex: [(r1,c1), (r2,c2), (r3,c3)]
     # Iteramos sobre os segmentos do caminho, ex: (r1,c1)->(r2,c2), depois (r2,c2)->(r3,c3)
-    for i in range(len(move) - 1):
-        start_pos = move[i]
-        end_pos = move[i+1]
+    for i in range(len(move_sequence) - 1):
+        src = move_sequence[i]  # CORRIGIDO: era current_piece_pos
+        dst = move_sequence[i+1]
+
+        # --- NOVO: Só permite movimento se a direção for válida para a casa de origem ---
+        linha, coluna = src
+        if linha % 2 == coluna % 2:
+            direcoes_validas = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+        else:
+            direcoes_validas = [(-1, 0), (0, -1), (0, 1), (1, 0)]
+        dx = dst[0] - src[0]
+        dy = dst[1] - src[1]
+        if (dx, dy) not in direcoes_validas:
+            # Movimento inválido para esta casa, ignore ou retorne estado inalterado
+            # print(f"Movimento inválido para casa ({linha},{coluna}): direção ({dx},{dy})")
+            return new_state, total_captured_pieces
+        # --- FIM DA CORREÇÃO ---
 
         # Mover a peça
-        piece_to_move = new_state[start_pos[0]][start_pos[1]]
-        new_state[start_pos[0]][start_pos[1]] = '-'
-        new_state[end_pos[0]][end_pos[1]] = piece_to_move
-        
-        d_lin = end_pos[0] - start_pos[0]
-        d_col = end_pos[1] - start_pos[1]
+        piece_to_move = new_state[src[0]][src[1]]
+        if piece_to_move != player:
+            return new_state, total_captured_pieces
+
+        new_state[src[0]][src[1]] = '-'
+        new_state[dst[0]][dst[1]] = piece_to_move
+
+        captured_this_segment: List[Tuple[int, int]] = []
+
+        # Normalize direction
+        norm_dx = 0 if dx == 0 else (1 if dx > 0 else -1)
+        norm_dy = 0 if dy == 0 else (1 if dy > 0 else -1)
 
         # Lógica de captura por APROXIMAÇÃO
-        approach_capture_pos = (end_pos[0] + d_lin, end_pos[1] + d_col)
+        approach_capture_pos = (dst[0] + norm_dx, dst[1] + norm_dy)
         if is_valid_pos(*approach_capture_pos) and new_state[approach_capture_pos[0]][approach_capture_pos[1]] == opponent:
             curr_pos = approach_capture_pos
             while is_valid_pos(*curr_pos) and new_state[curr_pos[0]][curr_pos[1]] == opponent:
-                total_captured_pieces.append(curr_pos)
+                captured_this_segment.append(curr_pos)
                 new_state[curr_pos[0]][curr_pos[1]] = '-'
-                curr_pos = (curr_pos[0] + d_lin, curr_pos[1] + d_col)
+                curr_pos = (curr_pos[0] + norm_dx, curr_pos[1] + norm_dy)
 
         # Lógica de captura por AFASTAMENTO
-        withdrawal_capture_pos = (start_pos[0] - d_lin, start_pos[1] - d_col)
+        withdrawal_capture_pos = (src[0] - norm_dx, src[1] - norm_dy)
         if is_valid_pos(*withdrawal_capture_pos) and new_state[withdrawal_capture_pos[0]][withdrawal_capture_pos[1]] == opponent:
             curr_pos = withdrawal_capture_pos
             while is_valid_pos(*curr_pos) and new_state[curr_pos[0]][curr_pos[1]] == opponent:
-                total_captured_pieces.append(curr_pos)
+                captured_this_segment.append(curr_pos)
                 new_state[curr_pos[0]][curr_pos[1]] = '-'
-                curr_pos = (curr_pos[0] - d_lin, curr_pos[1] - d_col)
+                curr_pos = (curr_pos[0] - norm_dx, curr_pos[1] - norm_dy)
+
+        total_captured_pieces.extend(captured_this_segment)
 
     return new_state, total_captured_pieces
