@@ -1,145 +1,168 @@
-from typing import List, Tuple, Optional
+# MiniMax/gerador_movimentos.py
 
+from typing import List, Tuple, Dict
+from copy import deepcopy
+
+# Tipos para clareza
 State = List[List[str]]
-# Move as a sequence of positions for chains; for single move keep two positions
-Move = List[Tuple[int, int]]  # [(lin_atual, col_atual), (lin_nova, col_nova), ...]
+Position = Tuple[int, int]
+Move = List[Position]  # Um movimento é um caminho: [(origem), (destino1), (destino2), ...]
 
-DIRECOES_8 = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-DIRECOES_4 = [(-1, 0), (0, -1), (0, 1), (1, 0)]
+DIRECTIONS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
+def is_valid_pos(lin: int, col: int) -> bool:
+    """Verifica se uma posição (lin, col) está dentro dos limites do tabuleiro 5x9."""
+    return 0 <= lin < 5 and 0 <= col < 9
 
-def generate_moves(state: State, player: str, board_config: Optional[dict] = None,
-                   last_move_end_pos: Optional[Tuple[int, int]] = None,
-                   visited_during_chain: Optional[List[Tuple[int, int]]] = None,
-                   last_direction: Optional[Tuple[int, int]] = None,
-                   capturas_apenas: bool = False,
-                   active_piece_pos: Optional[Tuple[int, int]] = None) -> List[Move]:  # Add active_piece_pos
-    """
-    Gera todos os movimentos legais para `player`.
-    Capturas obrigatórias: se houver qualquer captura, só retorna cadeias de captura.
-    """
-    opponent = 'X' if player == 'O' else 'O'  # Make sure your player representation matches ('v', 'b')
-    # ... rest of your function
-    # You will also need to decide how to use active_piece_pos within this function's logic.
-    # For example, if it's meant to restrict move generation to only that piece:
-    # if active_piece_pos:
-    #     i, j = active_piece_pos
-    #     # ... logic to generate moves only for the piece at (i,j) ...
-    # else:
-    #     # ... your existing logic to iterate through all pieces ...
+def is_strong_intersection(lin: int, col: int) -> bool:
+    """Verifica se uma interseção é forte (permite movimentos diagonais)."""
+    return (lin + col) % 2 == 0
 
-    all_caps: List[Move] = []
-    for i, row in enumerate(state):
-        for j, cell in enumerate(row):
-            if cell == player:
-                caps = possiveis_capturas(state, i, j, opponent, visited=[])
-                all_caps.extend(caps)
-    if all_caps:
-        return all_caps
+def aplicar_movimento(state: State, move: Move, player: str) -> Tuple[State, List[Position]]:
+    new_state = deepcopy(state)
+    opponent = 'b' if player == 'v' else 'v'
+    total_captured_pieces = []
 
-    moves: List[Move] = []
-    for i, row in enumerate(state):
-        for j, cell in enumerate(row):
-            if cell == player:
-                for dr, dc in DIRECOES_8:
-                    ni, nj = i + dr, j + dc
-                    if 0 <= ni < len(state) and 0 <= nj < len(row) and state[ni][nj] == '-':
-                        moves.append([(i, j), (ni, nj)])
-    if capturas_apenas:
-        capture_moves_only = []
-        # Implementar lógica para filtrar apenas os movimentos de captura
-        pass  # Placeholder: Implementar lógica de filtragem aqui
+    for i in range(len(move) - 1):
+        start_pos, end_pos = move[i], move[i+1]
+        
+        if not is_valid_pos(*start_pos) or not is_valid_pos(*end_pos): continue
 
-    return moves
+        piece_to_move = new_state[start_pos[0]][start_pos[1]]
+        new_state[start_pos[0]][start_pos[1]] = '-'
+        new_state[end_pos[0]][end_pos[1]] = piece_to_move
+        
+        d_lin, d_col = end_pos[0] - start_pos[0], end_pos[1] - start_pos[1]
 
+        # Captura por APROXIMAÇÃO
+        pos = (end_pos[0] + d_lin, end_pos[1] + d_col)
+        if is_valid_pos(*pos) and new_state[pos[0]][pos[1]] == opponent:
+            while is_valid_pos(*pos) and new_state[pos[0]][pos[1]] == opponent:
+                total_captured_pieces.append(pos)
+                new_state[pos[0]][pos[1]] = '-'
+                pos = (pos[0] + d_lin, pos[1] + d_col)
 
-def possiveis_capturas(state: State, r: int, c: int, opponent: str,
-                       visited: List[Tuple[int, int]]) -> List[Move]:
-    """
-    Retorna todas as cadeias de captura iniciando em (r,c).
-    Mantém a mesma peça e não reutiliza posições em `visited`.
-    """
-    sequences: List[Move] = []
-    for dr, dc in DIRECOES_8:
-        ni, nj = r + dr, c + dc
-        if _valid_capture(state, r, c, dr, dc, opponent, mode='approach', visited=visited):
-            new_state, captured = _apply_capture(state, r, c, dr, dc, opponent, mode='approach')
-            sub = possiveis_capturas(new_state, ni, nj, opponent, visited + captured)
-            if sub:
-                for seq in sub:
-                    sequences.append([(r, c)] + seq)
+        # Captura por AFASTAMENTO
+        pos = (start_pos[0] - d_lin, start_pos[1] - d_col)
+        if is_valid_pos(*pos) and new_state[pos[0]][pos[1]] == opponent:
+            while is_valid_pos(*pos) and new_state[pos[0]][pos[1]] == opponent:
+                total_captured_pieces.append(pos)
+                new_state[pos[0]][pos[1]] = '-'
+                pos = (pos[0] - d_lin, pos[1] - d_col)
+                
+    return new_state, total_captured_pieces
+
+def _get_capture_continuations(state: State, player: str, piece_pos: Position, visited_path: List[Position], last_direction: Position) -> List[Move]:
+    """Função recursiva para encontrar continuações de uma cadeia de captura."""
+    continuations = []
+    opponent = 'b' if player == 'v' else 'v'
+    
+    possible_directions = DIRECTIONS if is_strong_intersection(*piece_pos) else DIRECTIONS[1::2]
+
+    for d_lin, d_col in possible_directions:
+        current_direction = (d_lin, d_col)
+        if current_direction == last_direction or current_direction == (-last_direction[0], -last_direction[1]):
+            continue
+
+        # Captura por Aproximação
+        target_pos = (piece_pos[0] + d_lin, piece_pos[1] + d_col)
+        capture_check_pos = (target_pos[0] + d_lin, target_pos[1] + d_col)
+        if is_valid_pos(*target_pos) and target_pos not in visited_path and state[target_pos[0]][target_pos[1]] == '-' and is_valid_pos(*capture_check_pos) and state[capture_check_pos[0]][capture_check_pos[1]] == opponent:
+            temp_state, _ = aplicar_movimento(state, [piece_pos, target_pos], player)
+            sub_chains = _get_capture_continuations(temp_state, player, target_pos, visited_path + [target_pos], current_direction)
+            if not sub_chains:
+                continuations.append([target_pos])
             else:
-                sequences.append([(r, c), (ni, nj)])
-        ri, rj = r - dr, c - dc
-        if _valid_capture(state, r, c, dr, dc, opponent, mode='withdrawal', visited=visited):
-            new_state, captured = _apply_capture(state, r, c, dr, dc, opponent, mode='withdrawal')
-            sub = possiveis_capturas(new_state, ri, rj, opponent, visited + captured)
-            if sub:
-                for seq in sub:
-                    sequences.append([(r, c)] + seq)
+                for chain in sub_chains:
+                    continuations.append([target_pos] + chain)
+
+        # Captura por Afastamento
+        target_pos = (piece_pos[0] + d_lin, piece_pos[1] + d_col)
+        capture_check_pos = (piece_pos[0] - d_lin, piece_pos[1] - d_col)
+        if is_valid_pos(*target_pos) and target_pos not in visited_path and state[target_pos[0]][target_pos[1]] == '-' and is_valid_pos(*capture_check_pos) and state[capture_check_pos[0]][capture_check_pos[1]] == opponent:
+            temp_state, _ = aplicar_movimento(state, [piece_pos, target_pos], player)
+            sub_chains = _get_capture_continuations(temp_state, player, target_pos, visited_path + [target_pos], current_direction)
+            if not sub_chains:
+                continuations.append([target_pos])
             else:
-                sequences.append([(r, c), (ri, rj)])
-    return sequences
+                for chain in sub_chains:
+                    continuations.append([target_pos] + chain)
+
+    return continuations
 
 
-def _valid_capture(state: State, r: int, c: int, dr: int, dc: int,
-                   opponent: str, mode: str, visited: List[Tuple[int, int]]) -> bool:
-    if mode == 'approach':
-        i, j = r + dr, c + dc
-    else:
-        i, j = r - dr, c - dc
-    if not (0 <= i < len(state) and 0 <= j < len(state[0])):
-        return False
-    return state[i][j] == opponent and (i, j) not in visited
-
-
-def _apply_capture(state: State, r: int, c: int, dr: int, dc: int,
-                   opponent: str, mode: str) -> Tuple[State, List[Tuple[int, int]]]:
-    new = [row.copy() for row in state]
-    if mode == 'approach':
-        dest = (r + dr, c + dc)
-        cap = dest
-    else:
-        dest = (r - dr, c - dc)
-        cap = (r + dr, c + dc)
-    new[r][c] = '-'
-    new[dest[0]][dest[1]] = state[r][c]
-    captured: List[Tuple[int, int]] = []
-    if new[cap[0]][cap[1]] == opponent:
-        new[cap[0]][cap[1]] = '-'
-        captured.append(cap)
-    return new, captured
-
-
-def aplicar_movimento(state: State, move: Move, player: str) -> Tuple[State, List[Tuple[int, int]]]:
+def generate_moves(state: State, player: str) -> List[Move]:
     """
-    Aplica um movimento (ou cadeia) para `player` e retorna novo tabuleiro e lista de capturas.
-    Remove peças capturadas por aproximação e afastamento corretamente.
+    Gera todos os movimentos legais para um jogador.
+    Implementa a regra de captura obrigatória: se capturas existem, apenas elas são retornadas.
     """
-    new_state = [row.copy() for row in state]
-    opponent = 'X' if player == 'O' else 'O'
-    all_captured: List[Tuple[int, int]] = []
-    for idx in range(len(move) - 1):
-        src = move[idx]
-        dst = move[idx + 1]
-        piece = new_state[src[0]][src[1]]
-        new_state[src[0]][src[1]] = '-'
-        new_state[dst[0]][dst[1]] = piece
-        dx, dy = dst[0] - src[0], dst[1] - src[1]
-        # Captura aproximação: todas as peças entre src e dst na direção (dx,dy)
-        steps = max(abs(dx), abs(dy))
-        dir_x = dx//steps if steps else 0
-        dir_y = dy//steps if steps else 0
-        for step in range(1, steps+1):
-            cap = (src[0] + dir_x*step, src[1] + dir_y*step)
-            if 0 <= cap[0] < len(state) and 0 <= cap[1] < len(state[0]):
-                if new_state[cap[0]][cap[1]] == opponent:
-                    new_state[cap[0]][cap[1]] = '-'
-                    all_captured.append(cap)
-        # Captura afastamento: peça atrás src
-        back = (src[0] - dir_x, src[1] - dir_y)
-        if 0 <= back[0] < len(state) and 0 <= back[1] < len(state[0]):
-            if new_state[back[0]][back[1]] == opponent:
-                new_state[back[0]][back[1]] = '-'
-                all_captured.append(back)
-    return new_state, all_captured
+    capture_moves = []
+    
+    # 1. Identificar TODAS as capturas iniciais possíveis
+    for r in range(5):
+        for c in range(9):
+            if state[r][c] == player:
+                continuations = _get_capture_continuations(state, player, (r, c), [(r,c)], (0,0))
+                for chain in continuations:
+                    capture_moves.append([(r,c)] + chain)
+
+    # 2. Se houver movimentos de captura, retorne-os
+    if capture_moves:
+        return capture_moves
+
+    # 3. Se não houver capturas, gere movimentos normais (não capturantes)
+    non_capture_moves = []
+    for r in range(5):
+        for c in range(9):
+            if state[r][c] == player:
+                possible_directions = DIRECTIONS if is_strong_intersection(r, c) else DIRECTIONS[1::2]
+                for d_lin, d_col in possible_directions:
+                    target_pos = (r + d_lin, c + d_col)
+                    if is_valid_pos(*target_pos) and state[target_pos[0]][target_pos[1]] == '-':
+                        non_capture_moves.append([(r, c), target_pos])
+    
+    return non_capture_moves
+
+
+def aplicar_movimento(state: State, move: Move, player: str) -> Tuple[State, List[Position]]:
+    """
+    Aplica um movimento (que pode ser uma cadeia) a um estado do tabuleiro.
+    Retorna o novo estado e uma lista de peças capturadas.
+    """
+    new_state = deepcopy(state)
+    opponent = 'b' if player == 'v' else 'v'
+    total_captured_pieces = []
+
+    # Um movimento é uma lista de posições, ex: [(r1,c1), (r2,c2), (r3,c3)]
+    # Iteramos sobre os segmentos do caminho, ex: (r1,c1)->(r2,c2), depois (r2,c2)->(r3,c3)
+    for i in range(len(move) - 1):
+        start_pos = move[i]
+        end_pos = move[i+1]
+
+        # Mover a peça
+        piece_to_move = new_state[start_pos[0]][start_pos[1]]
+        new_state[start_pos[0]][start_pos[1]] = '-'
+        new_state[end_pos[0]][end_pos[1]] = piece_to_move
+        
+        d_lin = end_pos[0] - start_pos[0]
+        d_col = end_pos[1] - start_pos[1]
+
+        # Lógica de captura por APROXIMAÇÃO
+        approach_capture_pos = (end_pos[0] + d_lin, end_pos[1] + d_col)
+        if is_valid_pos(*approach_capture_pos) and new_state[approach_capture_pos[0]][approach_capture_pos[1]] == opponent:
+            curr_pos = approach_capture_pos
+            while is_valid_pos(*curr_pos) and new_state[curr_pos[0]][curr_pos[1]] == opponent:
+                total_captured_pieces.append(curr_pos)
+                new_state[curr_pos[0]][curr_pos[1]] = '-'
+                curr_pos = (curr_pos[0] + d_lin, curr_pos[1] + d_col)
+
+        # Lógica de captura por AFASTAMENTO
+        withdrawal_capture_pos = (start_pos[0] - d_lin, start_pos[1] - d_col)
+        if is_valid_pos(*withdrawal_capture_pos) and new_state[withdrawal_capture_pos[0]][withdrawal_capture_pos[1]] == opponent:
+            curr_pos = withdrawal_capture_pos
+            while is_valid_pos(*curr_pos) and new_state[curr_pos[0]][curr_pos[1]] == opponent:
+                total_captured_pieces.append(curr_pos)
+                new_state[curr_pos[0]][curr_pos[1]] = '-'
+                curr_pos = (curr_pos[0] - d_lin, curr_pos[1] - d_col)
+
+    return new_state, total_captured_pieces

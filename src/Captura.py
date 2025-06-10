@@ -322,3 +322,16 @@ class Captura:
                         ):
                             return True
         return False
+
+    def finalizar_cadeia_captura(self):
+        """Reseta o estado de captura em cadeia e seleção de peça."""
+        self.captura_em_cadeia_ativa = False
+        self.escolha_captura_ativa = False
+        self.posicoes_visitadas = []
+        self.ultima_direcao = None
+        self.posicao_ultima_peca = None
+        self.pecas_para_captura_aproximacao = []
+        self.pecas_para_captura_afastamento = []
+        self.dados_captura_ambigua = None
+        if hasattr(self, "movimentacao_ref") and self.movimentacao_ref:
+            self.movimentacao_ref.limpar_selecao()

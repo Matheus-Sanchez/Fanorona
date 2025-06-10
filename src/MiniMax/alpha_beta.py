@@ -1,151 +1,156 @@
-from typing import Tuple, List, Optional # Added List, Optional
-from .gerador_movimentos import generate_moves # generate_moves now has more params
-from .gerador_movimentos import aplicar_movimento # Assuming this is the simple one from gerador_movimentos.py
+# MiniMax/alpha_beta.py
+
+import random
+from typing import List, Tuple, Dict
+
+# Importando os tipos e funções refatoradas
+from .gerador_movimentos import State, Move, generate_moves, aplicar_movimento
 from .heuristica import evaluate_state
-from copy import deepcopy
 
-State = list[list[str]]
-Move = Tuple[Tuple[int, int], Tuple[int, int]]
+# --- Zobrist Hashing para Tabelas de Transposição ---
+# Dicionários para armazenar os números aleatórios para cada estado possível
+zobrist_table = {}
+# Inicializado uma vez no início do jogo
+def init_zobrist():
+    """Inicializa a tabela Zobrist com números aleatórios de 64 bits."""
+    # Para cada peça ('v', 'b') em cada casa
+    for r in range(5):
+        for c in range(9):
+            zobrist_table[('v', r, c)] = random.getrandbits(64)
+            zobrist_table[('b', r, c)] = random.getrandbits(64)
+    # Um valor para indicar de quem é a vez de jogar
+    zobrist_table['player_turn'] = random.getrandbits(64)
 
-# aplicar_movimento from this file is a utility, ensure it's the simple one if gerador_movimentos.aplicar_movimento is different
-# For this example, I'll assume the aplicar_movimento defined in this file is used.
-# If gerador_movimentos.aplicar_movimento is the canonical one, import and use that.
-# Let's remove the local one to avoid confusion and use the one from gerador_movimentos.
-# from .gerador_movimentos import aplicar_movimento as aplicar_movimento_simples
+def compute_hash(state: State, player: str) -> int:
+    """Calcula o hash Zobrist completo para um dado estado."""
+    h = 0
+    if player == 'b':
+        h ^= zobrist_table['player_turn']
+    for r in range(5):
+        for c in range(9):
+            if state[r][c] != '-':
+                h ^= zobrist_table[(state[r][c], r, c)]
+    return h
 
-# ... (remove local aplicar_movimento if it's a duplicate of gerador_movimentos.aplicar_movimento)
+# --- Tabela de Transposição ---
+class TranspositionTable:
+    def __init__(self):
+        self.table: Dict[int, Dict] = {}
 
-def _get_all_final_states_after_chain(current_s: State, player_for_chain: str, piece_at: Tuple[int, int], 
-                                      visited_path: List[Tuple[int, int]]) -> List[State]:
-    """
-    Recursively finds all possible board states after a chain capture sequence is completed.
-    """
-    # generate_moves is imported from .gerador_movimentos
-    # aplicar_movimento is also imported from .gerador_movimentos
+    def store(self, hash_key: int, depth: int, score: float, flag: str, best_move: Move = None):
+        """Armazena uma entrada na tabela."""
+        # Estratégia de substituição: sempre substitui se a nova busca for mais profunda
+        if hash_key not in self.table or self.table[hash_key]['depth'] <= depth:
+            self.table[hash_key] = {'depth': depth, 'score': score, 'flag': flag, 'best_move': best_move}
+
+    def probe(self, hash_key: int, depth: int, alpha: float, beta: float) -> Tuple[bool, float, Move]:
+        """Consulta a tabela. Retorna (encontrado, pontuação, melhor_movimento)."""
+        if hash_key in self.table:
+            entry = self.table[hash_key]
+            if entry['depth'] >= depth:
+                if entry['flag'] == 'EXACT':
+                    return True, entry['score'], entry.get('best_move')
+                if entry['flag'] == 'LOWERBOUND' and entry['score'] >= beta:
+                    return True, entry['score'], entry.get('best_move')
+                if entry['flag'] == 'UPPERBOUND' and entry['score'] <= alpha:
+                    return True, entry['score'], entry.get('best_move')
+        return False, 0.0, None
+
+# --- Algoritmo Alpha-Beta Refatorado ---
+def alpha_beta_search(
+    state: State,
+    player: str,
+    depth: int,
+    alpha: float,
+    beta: float,
+    maximizing_player: bool,
+    tt: TranspositionTable,
+    history: set
+) -> float:
+    """Implementação do algoritmo Alpha-Beta com Tabelas de Transposição e prevenção de ciclos."""
     
-    chain_moves = generate_moves(current_s, player_for_chain,
-                                 capturas_apenas=True,  # Chains are always captures
-                                 active_piece_pos=piece_at,
-                                 visited_in_chain=visited_path)
-    if not chain_moves:
-        return [current_s]  # Base case: no more chain moves
+    # 1. Cálculo do Hash e Verificação de Ciclos/Tabela de Transposição
+    original_alpha = alpha
+    state_hash = compute_hash(state, player)
 
-    all_resulting_states: List[State] = []
-    for chain_m in chain_moves:
-        # aplicar_movimento from gerador_movimentos should be used
-        state_after_chain_m = aplicar_movimento(current_s, chain_m, player_for_chain)
-        
-        new_piece_pos = chain_m[1]
-        new_visited_path = visited_path + [new_piece_pos]
-        
-        all_resulting_states.extend(
-            _get_all_final_states_after_chain(state_after_chain_m, player_for_chain, new_piece_pos, new_visited_path)
-        )
-    
-    # If all chain_moves led to no further valid chains (e.g. all branches ended),
-    # but this function was called because chain_moves was initially non-empty,
-    # this means those branches have been explored.
-    # If all_resulting_states is empty here, it means the initial chain_moves didn't lead to valid deeper states.
-    # This shouldn't happen if generate_moves and aplicar_movimento are correct.
-    # If a chain_move is made, it must result in at least one state.
-    return all_resulting_states if all_resulting_states else [current_s] # Fallback if something went wrong
+    # Prevenção de ciclo: se já vimos este estado neste caminho de busca, é um empate.
+    if state_hash in history:
+        return 0.0
 
-def alpha_beta_search(state: State, player: str, move: Move, depth: int) -> float:
-    # This function seems to be an entry point that applies one move first.
-    # It should also handle the start of a chain.
-    next_state_after_first_move = aplicar_movimento(state, move, player) # from gerador_movimentos
-    opponent = "b" if player == "v" else "v"
+    # Consulta à Tabela de Transposição
+    found, score, best_move_from_tt = tt.probe(state_hash, depth, alpha, beta)
+    if found:
+        return score
 
-    active_piece_pos = move[1]
-    visited_path_for_chain = [move[0], move[1]] # Path includes start and end of first move
-
-    final_states_from_this_initial_move = _get_all_final_states_after_chain(
-        next_state_after_first_move, player, active_piece_pos, visited_path_for_chain
-    )
-
-    # If the initial move leads to multiple outcomes due to chain choices,
-    # we need to decide how to evaluate. Typically, minimax evaluates the best outcome for the current player.
-    # For now, let's assume we evaluate all and the calling IA function will pick.
-    # Or, if this is the main alphabeta, it should branch.
-    # The current alphabeta structure below is better: it iterates initial_moves.
-
-    # This alpha_beta_search might not be the one used by ia.py directly.
-    # Let's assume ia.py calls the main `alphabeta` function.
-    # So, this `alpha_beta_search` might be for a different purpose or can be removed if unused.
-    # For now, let's make it evaluate one of the final states.
-    if not final_states_from_this_initial_move: # Should not happen
-        return evaluate_state(next_state_after_first_move, player) # Or opponent? Depends on whose turn it is after chain.
-
-    # This part is tricky: which final_state to pass to alphabeta?
-    # If player is maximizing, they'd choose the chain leading to best outcome.
-    # This suggests the chain logic should be *inside* the main alphabeta loop.
-    # Let's assume for now this function is simplified or ia.py calls the main alphabeta.
-    # The main alphabeta below is more robust.
-    # We will focus on the main `alphabeta` function.
-    # This `alpha_beta_search` will be simplified or removed later if not the primary entry.
-    # For now, just evaluate the first outcome of the chain for this specific path.
-    return alphabeta(final_states_from_this_initial_move[0], opponent, depth - 1, float("-inf"), float("inf"), maximizing=False)
-
-
-def alphabeta(state: State, player: str, depth: int,
-              alpha: float, beta: float, maximizing: bool) -> float:
+    # 2. Condição de Parada (base da recursão)
     if depth == 0:
         return evaluate_state(state, player)
 
-    initial_moves = generate_moves(state, player) # Gets all valid first moves (captures prioritized)
-    if not initial_moves:
+    # 3. Geração e Ordenação de Movimentos
+    moves = generate_moves(state, player)
+    if not moves: # Fim de jogo
         return evaluate_state(state, player)
 
-    opponent = "b" if player == "v" else "v"
+    # Ordenação de Movimentos:
+    # 1. Tente o melhor movimento da Tabela de Transposição primeiro.
+    # 2. Heurística simples: priorize capturas que removem mais peças.
+    def move_sort_key(m):
+        if best_move_from_tt and m == best_move_from_tt:
+            return float('-inf') # Prioridade máxima
+        _, captured = aplicar_movimento(state, m, player)
+        return -len(captured) # Negativo para ordenar do maior para o menor
 
-    if maximizing:
-        max_eval = float("-inf")
-        for first_move in initial_moves:
-            state_after_first_move = aplicar_movimento(state, first_move, player) # from gerador_movimentos
-            
-            active_piece_pos = first_move[1] 
-            visited_path_for_chain = [first_move[0], first_move[1]]
+    moves.sort(key=move_sort_key)
+    
+    # 4. Lógica da Busca Recursiva
+    history.add(state_hash)
+    best_move_found = None
+    
+    opponent = 'b' if player == 'v' else 'v'
 
-            final_states = _get_all_final_states_after_chain(
-                state_after_first_move, player, active_piece_pos, visited_path_for_chain
-            )
-            
-            # The player will choose the chain continuation that maximizes their outcome.
-            # So, for each first_move, we find the best possible outcome after its chain.
-            current_first_move_best_outcome_val = float("-inf")
-            if not final_states: # Should mean state_after_first_move was the end.
-                 final_states = [state_after_first_move]
-
-            for final_s in final_states:
-                eval_val = alphabeta(final_s, opponent, depth - 1, alpha, beta, False)
-                current_first_move_best_outcome_val = max(current_first_move_best_outcome_val, eval_val)
-            
-            max_eval = max(max_eval, current_first_move_best_outcome_val)
-            alpha = max(alpha, max_eval)
-            if alpha >= beta:
-                break 
-        return max_eval
-    else: # Minimizing
-        min_eval = float("inf")
-        for first_move in initial_moves:
-            state_after_first_move = aplicar_movimento(state, first_move, player)
-            active_piece_pos = first_move[1]
-            visited_path_for_chain = [first_move[0], first_move[1]]
-
-            final_states = _get_all_final_states_after_chain(
-                state_after_first_move, player, active_piece_pos, visited_path_for_chain
-            )
-
-            current_first_move_worst_outcome_val = float("inf")
-            if not final_states:
-                final_states = [state_after_first_move]
-
-            for final_s in final_states:
-                eval_val = alphabeta(final_s, opponent, depth - 1, alpha, beta, True)
-                current_first_move_worst_outcome_val = min(current_first_move_worst_outcome_val, eval_val)
-            
-            min_eval = min(min_eval, current_first_move_worst_outcome_val)
-            beta = min(beta, min_eval)
+    if maximizing_player: # Jogador 'v' (vermelho)
+        max_eval = float('-inf')
+        for move in moves:
+            next_state, _ = aplicar_movimento(state, move, player)
+            evaluation = alpha_beta_search(next_state, opponent, depth - 1, alpha, beta, False, tt, history)
+            if evaluation > max_eval:
+                max_eval = evaluation
+                best_move_found = move
+            alpha = max(alpha, evaluation)
             if beta <= alpha:
-                break
+                break # Poda Beta
+        history.remove(state_hash)
+
+        # 5. Armazenamento na Tabela de Transposição
+        flag = 'EXACT'
+        if max_eval <= original_alpha:
+            flag = 'UPPERBOUND'
+        elif max_eval >= beta:
+            flag = 'LOWERBOUND'
+        tt.store(state_hash, depth, max_eval, flag, best_move_found)
+        
+        return max_eval
+
+    else: # Jogador 'b' (azul)
+        min_eval = float('inf')
+        for move in moves:
+            next_state, _ = aplicar_movimento(state, move, player)
+            evaluation = alpha_beta_search(next_state, opponent, depth - 1, alpha, beta, True, tt, history)
+            if evaluation < min_eval:
+                min_eval = evaluation
+                best_move_found = move
+            beta = min(beta, evaluation)
+            if beta <= alpha:
+                break # Poda Alfa
+        history.remove(state_hash)
+        
+        # 5. Armazenamento na Tabela de Transposição
+        flag = 'EXACT'
+        if min_eval <= original_alpha:
+            flag = 'UPPERBOUND'
+        elif min_eval >= beta:
+            flag = 'LOWERBOUND'
+        tt.store(state_hash, depth, min_eval, flag, best_move_found)
+        
         return min_eval
+
