@@ -265,6 +265,7 @@ def main():
                 if melhor_jogada:
                     print(f"IA escolheu o movimento: {melhor_jogada}")
                     cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
+                    # Anima todos os segmentos da cadeia normalmente
                     for i in range(len(melhor_jogada) - 1):
                         origem = melhor_jogada[i]
                         destino = melhor_jogada[i+1]
@@ -272,6 +273,17 @@ def main():
                         movimentacao.peca_selecionada = origem
                         movimentacao.movimentos_possiveis = [destino]
                         movimentacao.mover_peca(destino[0], destino[1], IA_PLAYER)
+                    # Após a cadeia, destaque a peça final por um instante para o usuário perceber o fim da animação
+                    ultima_pos = melhor_jogada[-1]
+                    tela.fill((255, 255, 255))
+                    tabuleiro.desenhar(tela)
+                    pecas.desenhar_pecas(tela)
+                    # Destaca a peça final da IA
+                    x = movimentacao.tabuleiro_offset_x + ultima_pos[1] * movimentacao.tamanho_celula + movimentacao.tamanho_celula // 2
+                    y = movimentacao.tabuleiro_offset_y + ultima_pos[0] * movimentacao.tamanho_celula + movimentacao.tamanho_celula // 2
+                    pygame.draw.circle(tela, cor_peca, (x, y), movimentacao.tamanho_celula // 3)
+                    pygame.display.flip()
+                    pygame.time.delay(350)  # Pequena pausa para visualização
                     movimentacao.limpar_selecao()
                     if captura.captura_em_cadeia_ativa or captura.escolha_captura_ativa:
                         captura.finalizar_cadeia_captura()
@@ -282,8 +294,8 @@ def main():
                     from MiniMax.gerador_movimentos import generate_moves
                     movimentos_possiveis = generate_moves(estado_ia, IA_PLAYER)
                     if movimentos_possiveis:
-                        # Força a IA a jogar o primeiro movimento possível
                         print("IA não encontrou jogada ótima, mas ainda há movimentos possíveis. Forçando o primeiro movimento legal.")
+                        print(f"IA (v) escolheu o movimento: None com valor: -inf")
                         melhor_jogada = movimentos_possiveis[0]
                         cor_peca = (195, 31, 9) if IA_PLAYER == "v" else (1, 151, 246)
                         for i in range(len(melhor_jogada) - 1):
