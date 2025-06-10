@@ -9,17 +9,18 @@ from .agent import QLearningAgent
 from MiniMax.ia import escolher_movimento_ia
 
 # Configurações
-MODELO_DIR = os.path.join("Q-Learning", "modelos")
+MODELO_DIR = os.path.join(os.path.dirname(__file__), "modelos")
 os.makedirs(MODELO_DIR, exist_ok=True)
 
 # Hiperparâmetros
-NUM_EPISODIOS = 500
-ALFA = 0.1
+NUM_EPISODIOS = 20000
+ALFA = 0.01
 GAMMA = 0.99
-EPSILON = 0.4
-MIN_EPSILON = 0.05
-DECAY_RATE = 0.995
-CHECKPOINT_INTERVAL = 100
+EPSILON = 1.0
+MIN_EPSILON = 0.01
+DECAY_RATE = 0.9995
+CHECKPOINT_INTERVAL = 1000
+STATS_UPDATE_INTERVAL = 100
 WINDOW = 500
 
 def async_save(agent, file_path):
@@ -66,7 +67,7 @@ def train_agent():
             if current_player == q_agent_player:
                 action = agent.choose_action(state_list, legal_actions)
             else: # Minimax
-                action = escolher_movimento_ia(state_list, current_player, depth=2) # Profundidade 2 para acelerar
+                action = escolher_movimento_ia(state_list, current_player, depth=5) # Profundidade 2 para acelerar
 
             if action is None: # Se a IA não escolheu (ou não pôde escolher)
                 done = True
@@ -111,29 +112,6 @@ def train_agent():
     print("Treinamento concluído!")
     agent.save_policy(caminho_modelo)
 
-    try:
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(12,5))
-        plt.subplot(1,2,1)
-        plt.plot(avg_rewards)
-        plt.title("Recompensa média")
-        plt.xlabel(f"Janela (x{WINDOW} episódios)")
-        plt.ylabel("Recompensa")
-        plt.grid(True)
-
-        plt.subplot(1,2,2)
-        plt.plot(win_rates)
-        plt.title("Taxa de vitórias")
-        plt.xlabel(f"Janela (x{WINDOW} episódios)")
-        plt.ylabel("Vitórias (%)")
-        plt.grid(True)
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(MODELO_DIR, "evolucao_treinamento.png"))
-        print(f"Gráfico salvo em {os.path.join(MODELO_DIR, 'evolucao_treinamento.png')}")
-        # plt.show() # Descomente se quiser ver o gráfico imediatamente
-    except ImportError:
-        print("matplotlib não instalado — gráficos não gerados.")
 
 if __name__ == "__main__":
     train_agent()

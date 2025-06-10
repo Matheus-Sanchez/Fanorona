@@ -9,8 +9,8 @@ import os
 import threading
 
 # A constante MODELO_DIR agora será usada como o padrão
-MODELO_DIR = os.path.join("Q-Learning", "modelos") 
-os.makedirs(MODELO_DIR, exist_ok=True) # Garante que o diretório exista
+MODELO_DIR = os.path.join(os.path.dirname(__file__), "modelos")
+os.makedirs(MODELO_DIR, exist_ok=True)
 
 class QLearningAgent:
     """

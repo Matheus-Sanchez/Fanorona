@@ -20,10 +20,11 @@ from Q_Learning.ia import escolher_movimento_qlearning
 from Q_Learning.train import train_agent
 
 # --- Constantes ---
-LARGURA, ALTURA = 1000, 600
+LARGURA, ALTURA = 1280, 720
 pygame.init()
 TELA = pygame.display.set_mode((LARGURA, ALTURA))
 pygame.display.set_caption("Fanorona")
+depth = 5  # Profundidade padrão para o MiniMax
 
 FONTE = pygame.font.Font(None, 36)
 FONTE_GRANDE = pygame.font.Font(None, 50)
@@ -36,7 +37,7 @@ COR_PRETO = (0, 0, 0)
 COR_CAMINHO_CADEIA = (100, 100, 100)
 
 def menu_inicial(tela):
-    imagem_fundo = pygame.image.load(os.path.join("assets", "1.png"))
+    imagem_fundo = pygame.image.load(os.path.join("assets", "menu.jpg"))
     imagem_fundo = pygame.transform.scale(imagem_fundo, (LARGURA, ALTURA))
     opcoes = {
         "1": "Humano vs Humano", "2": "Humano vs MiniMax", "3": "MiniMax vs MiniMax",
@@ -45,28 +46,20 @@ def menu_inicial(tela):
     }
     while True:
         tela.blit(imagem_fundo, (0, 0))
-        titulo = FONTE_GRANDE.render("Fanorona - Menu Principal", True, COR_BRANCO)
-        tela.blit(titulo, (LARGURA // 2 - titulo.get_width() // 2, 50))
-        y_pos = 150
-        for key, text in opcoes.items():
-            opcao_texto = FONTE_MENU.render(f"[{key}] {text}", True, COR_BRANCO)
-            tela.blit(opcao_texto, (LARGURA // 2 - opcao_texto.get_width() // 2, y_pos))
-            y_pos += 50
-        texto_sair = FONTE_MENU.render("[ESC] Sair do Jogo", True, COR_BRANCO)
-        tela.blit(texto_sair, (LARGURA // 2 - texto_sair.get_width() // 2, y_pos + 20))
         pygame.display.flip()
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT or (evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE):
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_1: return "h_vs_h"
-                if evento.key == pygame.K_2: return "h_vs_mm"
-                if evento.key == pygame.K_3: return "mm_vs_mm"
-                if evento.key == pygame.K_4: return "h_vs_q"
-                if evento.key == pygame.K_5: return "mm_vs_q"
-                if evento.key == pygame.K_6: return "train_q"
-                if evento.key == pygame.K_0: exibir_imagem(tela)  # Chama a função de exibir imagem/manual ilustrado
+                if evento.key in (pygame.K_1, pygame.K_KP1): return "h_vs_h"
+                if evento.key in (pygame.K_2, pygame.K_KP2): return "h_vs_mm"
+                if evento.key in (pygame.K_3, pygame.K_KP3): return "mm_vs_mm"
+                if evento.key in (pygame.K_4, pygame.K_KP4): return "h_vs_q"
+                if evento.key in (pygame.K_5, pygame.K_KP5): return "mm_vs_q"
+                if evento.key in (pygame.K_6, pygame.K_KP6): return "_qvs_q"
+                if evento.key in (pygame.K_7, pygame.K_KP7): return "train_q"
+                if evento.key in (pygame.K_0, pygame.K_KP0): exibir_imagem(tela)  # Chama a função de exibir imagem/manual ilustrado
 
 def escolher_cor(tela):
     while True:
@@ -85,7 +78,8 @@ def escolher_cor(tela):
             if evento.type == pygame.KEYDOWN:
                 if evento.key == pygame.K_v: return 'v'
                 if evento.key == pygame.K_b: return 'b'
-def desenhar_indicador_turno(jogador_atual, tipos_jogadores, ia_pensando, ia_frame):
+                
+def desenhar_indicador_turno(tela, jogador_atual, tipos_jogadores, ia_pensando, ia_frame):
     """Desenha o texto que indica de quem é a vez."""
     tipo_jogador_v = tipos_jogadores.get('v', 'HUMANO')
     tipo_jogador_b = tipos_jogadores.get('b', 'HUMANO')
@@ -100,7 +94,7 @@ def desenhar_indicador_turno(jogador_atual, tipos_jogadores, ia_pensando, ia_fra
         texto_str += " pensando" + "." * (ia_frame % 4)
         
     texto_turno = FONTE.render(texto_str, True, cor)
-    TELA.blit(texto_turno, (10, 10))
+    tela.blit(texto_turno, (10, 10))
     
 def exibir_tela_final(mensagem):
     texto_vencedor = FONTE_GRANDE.render(mensagem, True, COR_V)
@@ -135,8 +129,8 @@ def animar_movimento(tela, movimentacao, pecas, origem, destino, cor_peca, delay
 
 def exibir_imagem(tela):
     """Exibe uma imagem/manual ilustrado e volta ao menu ao pressionar ESC."""
-    imagem = pygame.image.load("./assets/2.png")  
-    imagem = pygame.transform.scale(imagem, (800, 500))  # Ajusta o tamanho da imagem
+    imagem = pygame.image.load("./assets/menu.jpg")  
+    imagem = pygame.transform.scale(imagem, (1280, 720))  # Ajusta o tamanho da imagem
     rodando = True
     while rodando:
         tela.fill((0, 0, 0))
@@ -169,6 +163,7 @@ def jogo(modo):
     captura.set_gerenciador_pecas(pecas); captura.set_tabuleiro(tabuleiro); movimentacao.set_captura_ref(captura)
     if hasattr(movimentacao.gerenciador_pecas, 'tabuleiro_ref') is False: movimentacao.gerenciador_pecas.tabuleiro_ref = tabuleiro
     
+
     jogador_atual = "v"
     mensagem_vencedor = None
     rodando = True
@@ -196,7 +191,7 @@ def jogo(modo):
                 pygame.draw.circle(TELA, COR_CAMINHO_CADEIA, (centro_x, centro_y), 10)
         if captura.escolha_captura_ativa: captura.desenhar_botoes_captura(TELA)
         
-        desenhar_indicador_turno(jogador_atual, tipos_jogadores, ia_pensando, int(time.time() * 2) % 4)
+        desenhar_indicador_turno(TELA, jogador_atual, tipos_jogadores, tipo_jogador_atual != 'HUMANO', int(time.time() * 2) % 4)
 
         if not mensagem_vencedor:
             if not any("v" in row for row in configuracao_inicial): mensagem_vencedor = "Jogador Azul (B) Venceu!"
@@ -211,63 +206,73 @@ def jogo(modo):
         TELA.blit(texto_menu, (botao_menu_rect.x + botao_menu_rect.width // 2 - texto_menu.get_width() // 2, botao_menu_rect.y + 8))
 
         if tipo_jogador_atual != 'HUMANO' and not captura.escolha_captura_ativa:
-            pygame.display.flip() # Atualiza a tela para mostrar "pensando..."
+            pygame.event.pump() # Processa eventos internos para evitar que a janela trave
+            
             estado_atual = [list(l) for l in configuracao_inicial]
-            melhor_jogada = escolher_movimento_ia(estado_atual, jogador_atual, depth=3) if tipo_jogador_atual == 'MINIMAX' else escolher_movimento_qlearning(estado_atual, jogador_atual)
+            
+            if tipo_jogador_atual == 'MINIMAX':
+                melhor_jogada = escolher_movimento_ia(estado_atual, jogador_atual, depth)
+            else: # QLEARNING
+                melhor_jogada = escolher_movimento_qlearning(estado_atual, jogador_atual)
             
             if not melhor_jogada:
-                movimentos_possiveis = generate_moves(estado_atual, jogador_atual)
-                if movimentos_possiveis: melhor_jogada = movimentos_possiveis[0]
-                else: mensagem_vencedor = f"Jogador {'B' if jogador_atual == 'v' else 'V'} venceu!"; continue
+                if not generate_moves(estado_atual, jogador_atual):
+                    oponente = 'B' if jogador_atual == 'v' else 'V'
+                    exibir_tela_final(f"Jogador {oponente} venceu! (IA sem movimentos)"); return
+                else: # Se há movimentos mas a IA não escolheu, pega o primeiro
+                    melhor_jogada = generate_moves(estado_atual, jogador_atual)[0]
 
-            if melhor_jogada:
-                cor_peca = COR_V if jogador_atual == 'v' else COR_B
-                for i in range(len(melhor_jogada) - 1):
-                    origem, destino = melhor_jogada[i], melhor_jogada[i+1]
-                    animar_movimento(TELA, movimentacao, pecas, origem, destino, cor_peca)
-                    movimentacao.peca_selecionada = origem
-                    movimentacao.mover_peca(destino[0], destino[1], jogador_atual)
+            # Executa a jogada da IA
+            cor_peca = COR_V if jogador_atual == 'v' else COR_B
+            for i in range(len(melhor_jogada) - 1):
+                origem, destino = melhor_jogada[i], melhor_jogada[i+1]
+                animar_movimento(TELA, movimentacao, pecas, origem, destino, cor_peca)
+                movimentacao.peca_selecionada = origem
+                movimentacao.mover_peca(destino[0], destino[1], jogador_atual)
 
+                # Se o movimento resultou em uma escolha de captura, a IA decide
+                if captura.escolha_captura_ativa:
+                    oponente = 'b' if jogador_atual == 'v' else 'v'
+                    d_linha = destino[0] - origem[0]
+                    d_coluna = destino[1] - origem[1]
+                    norm_dl = d_linha // abs(d_linha) if d_linha != 0 else 0
+                    norm_dc = d_coluna // abs(d_coluna) if d_coluna != 0 else 0
 
-                    # --- LÓGICA DE ESCOLHA AUTOMÁTICA DA IA (DENTRO DE MAIN.PY) ---
-                    if captura.escolha_captura_ativa:
-                        oponente = 'b' if jogador_atual == 'v' else 'v'
-                        d_linha = destino[0] - origem[0]
-                        d_coluna = destino[1] - origem[1]
-                        norm_dl = d_linha // abs(d_linha) if d_linha != 0 else 0
-                        norm_dc = d_coluna // abs(d_coluna) if d_coluna != 0 else 0
-
-                        # Verifica as duas opções de captura
-                        pecas_aprox = captura.verificar_pecas_captura(destino[0], destino[1], norm_dl, norm_dc, oponente, configuracao_inicial)
-                        pecas_afast = captura.verificar_pecas_captura(origem[0], origem[1], -norm_dl, -norm_dc, oponente, configuracao_inicial)
-                        
-                        # Executa a captura com mais peças
-                        if len(pecas_aprox) >= len(pecas_afast):
-                            captura.finalizar_movimento_com_captura(destino[0], destino[1], norm_dl, norm_dc, oponente, configuracao_inicial, TELA)
-                        else:
-                            captura.finalizar_movimento_com_captura(origem[0], origem[1], -norm_dl, -norm_dc, oponente, configuracao_inicial, TELA)
-                
+                    pecas_aprox = captura.verificar_pecas_captura(destino[0], destino[1], norm_dl, norm_dc, oponente, configuracao_inicial)
+                    pecas_afast = captura.verificar_pecas_captura(origem[0], origem[1], -norm_dl, -norm_dc, oponente, configuracao_inicial)
+                    
+                    if len(pecas_aprox) >= len(pecas_afast):
+                        captura.finalizar_movimento_com_captura(destino[0], destino[1], norm_dl, norm_dc, oponente, configuracao_inicial, TELA)
+                    else:
+                        captura.finalizar_movimento_com_captura(origem[0], origem[1], -norm_dl, -norm_dc, oponente, configuracao_inicial, TELA)
+            
+            
+            # **CORREÇÃO CRÍTICA**: Garante que o estado seja limpo e o turno passe APÓS a jogada completa.
+            if not captura.captura_em_cadeia_ativa:
                 movimentacao.limpar_selecao()
-                if not captura.captura_em_cadeia_ativa: jogador_atual = "b" if jogador_atual == "v" else "v"
+                jogador_atual = "b" if jogador_atual == "v" else "v"
+            else: # Se ainda está em cadeia, limpa a seleção para o próximo passo da cadeia
+                movimentacao.limpar_selecao()
+                movimentacao.peca_selecionada = melhor_jogada[-1] # Mantém a peça da cadeia selecionada
+
         else: # Lógica para jogador HUMANO
             for evento in pygame.event.get():
                 if evento.type == pygame.QUIT: rodando = False
                 if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE: return
-                if evento.type == pygame.MOUSEBUTTONDOWN:
-                    if botao_menu_rect.collidepoint(evento.pos):
-                        return  # Volta ao menu principal
-                    if not ia_pensando:
-                        x, y = evento.pos
-                        if captura.escolha_captura_ativa:
-                            if captura.processar_clique_botoes(x, y):
-                                if not captura.captura_em_cadeia_ativa: jogador_atual = "b" if jogador_atual == "v" else "v"
-                        else:
-                            movimento_realizado = movimentacao.processar_clique(x, y, jogador_atual)
-                            if movimento_realizado and not captura.captura_em_cadeia_ativa:
-                                jogador_atual = "b" if jogador_atual == "v" else "v"
+                if evento.type == pygame.MOUSEBUTTONDOWN and tipo_jogador_atual == 'HUMANO':
+                    x, y = evento.pos
+                    if captura.escolha_captura_ativa:
+                        if captura.processar_clique_botoes(x, y):
+                            if not captura.captura_em_cadeia_ativa: jogador_atual = "b" if jogador_atual == "v" else "v"
+                    else:
+                        movimento_realizado = movimentacao.processar_clique(x, y, jogador_atual)
+                        if movimento_realizado and not captura.captura_em_cadeia_ativa:
+                            jogador_atual = "b" if jogador_atual == "v" else "v"
 
         pygame.display.flip()
         clock.tick(30)
+    
+ 
     
     pygame.quit()
     sys.exit()
