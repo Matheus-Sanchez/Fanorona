@@ -6,18 +6,23 @@ import pygame
 import random
 import time
 
-# --- Bloco de Importação (Mantido como no seu original) ---
-# Adiciona a pasta 'src' ao caminho do Python para que ele encontre os módulos.
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from Tabuleiro import Tabuleiro
 from Pecas import GerenciadorPecas
 from Movimentacao import Movimentacao
 from Captura import Captura
-from MiniMax.ia import escolher_movimento_ia
+# Importa ambas as versões da IA
+from MiniMax.ia import escolher_movimento_ia, escolher_movimento_ia_paralelo
 from MiniMax.gerador_movimentos import generate_moves
 from Q_Learning.ia import escolher_movimento_qlearning
 from Q_Learning.train import train_agent
+
+# --- CONFIGURAÇÃO DE PERFORMANCE ---
+# Use os.cpu_count() para usar todos os núcleos disponíveis, ou defina um número.
+# Usar todos pode deixar o sistema um pouco lento, a metade é um bom começo.
+NUM_THREADS = os.cpu_count() // 2 or 1
+print(f"Usando {NUM_THREADS} threads para a IA MiniMax.")
 
 # --- Constantes ---
 LARGURA, ALTURA = 1280, 720
@@ -206,47 +211,41 @@ def jogo(modo):
         TELA.blit(texto_menu, (botao_menu_rect.x + botao_menu_rect.width // 2 - texto_menu.get_width() // 2, botao_menu_rect.y + 8))
 
         if tipo_jogador_atual != 'HUMANO' and not captura.escolha_captura_ativa:
-            pygame.event.pump() # Processa eventos internos para evitar que a janela trave
-            
+            pygame.event.pump() 
             estado_atual = [list(l) for l in configuracao_inicial]
             
+            melhor_jogada = None
             if tipo_jogador_atual == 'MINIMAX':
-                melhor_jogada = escolher_movimento_ia(estado_atual, jogador_atual, depth)
+                # --- USA A VERSÃO PARALELA ---
+                melhor_jogada = escolher_movimento_ia_paralelo(estado_atual, jogador_atual, depth=4, num_threads=NUM_THREADS)
             else: # QLEARNING
                 melhor_jogada = escolher_movimento_qlearning(estado_atual, jogador_atual)
             
-            if not melhor_jogada:
+            if not melhor_jogada: # Lógica de fallback
                 if not generate_moves(estado_atual, jogador_atual):
                     oponente = 'B' if jogador_atual == 'v' else 'V'
-                    exibir_tela_final(f"Jogador {oponente} venceu! (IA sem movimentos)"); return
-                else: # Se há movimentos mas a IA não escolheu, pega o primeiro
-                    melhor_jogada = generate_moves(estado_atual, jogador_atual)[0]
+                    exibir_tela_final(f"Jogador {oponente} venceu!"); return
+                else: melhor_jogada = generate_moves(estado_atual, jogador_atual)[0]
 
-            # Executa a jogada da IA
             cor_peca = COR_V if jogador_atual == 'v' else COR_B
             for i in range(len(melhor_jogada) - 1):
                 origem, destino = melhor_jogada[i], melhor_jogada[i+1]
                 animar_movimento(TELA, movimentacao, pecas, origem, destino, cor_peca)
                 movimentacao.peca_selecionada = origem
                 movimentacao.mover_peca(destino[0], destino[1], jogador_atual)
-
-                # Se o movimento resultou em uma escolha de captura, a IA decide
-                if captura.escolha_captura_ativa:
+                if captura.escolha_captura_ativa: # Decisão automática da IA
                     oponente = 'b' if jogador_atual == 'v' else 'v'
-                    d_linha = destino[0] - origem[0]
-                    d_coluna = destino[1] - origem[1]
-                    norm_dl = d_linha // abs(d_linha) if d_linha != 0 else 0
-                    norm_dc = d_coluna // abs(d_coluna) if d_coluna != 0 else 0
-
+                    d_linha, d_coluna = destino[0] - origem[0], destino[1] - origem[1]
+                    norm_dl, norm_dc = (d_linha > 0) - (d_linha < 0), (d_coluna > 0) - (d_coluna < 0)
                     pecas_aprox = captura.verificar_pecas_captura(destino[0], destino[1], norm_dl, norm_dc, oponente, configuracao_inicial)
                     pecas_afast = captura.verificar_pecas_captura(origem[0], origem[1], -norm_dl, -norm_dc, oponente, configuracao_inicial)
-                    
                     if len(pecas_aprox) >= len(pecas_afast):
                         captura.finalizar_movimento_com_captura(destino[0], destino[1], norm_dl, norm_dc, oponente, configuracao_inicial, TELA)
                     else:
                         captura.finalizar_movimento_com_captura(origem[0], origem[1], -norm_dl, -norm_dc, oponente, configuracao_inicial, TELA)
-            
-            
+ 
+ 
+ 
             # **CORREÇÃO CRÍTICA**: Garante que o estado seja limpo e o turno passe APÓS a jogada completa.
             if not captura.captura_em_cadeia_ativa:
                 movimentacao.limpar_selecao()
