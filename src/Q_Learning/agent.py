@@ -19,13 +19,15 @@ class QLearningAgent:
       quase infinito de estados/ações.
     - O loop de treinamento é episódico (jogo a jogo).
     """
-    def __init__(self, gamma=0.90, alpha=0.1, epsilon=0.4): 
+    def __init__(self, gamma=0.90, alpha=0.1, epsilon=0.4, min_e=0.01, decay=0.99995): 
         self.q_table = {}
         self.policy = {}   
         
         self.desconto = gamma    
         self.alpha = alpha
-        self.e = epsilon  
+        self.e = epsilon
+        self.min_e = min_e  # Adiciona o atributo min_e
+        self.decay_rate = decay # Adiciona o atributo para a taxa de decaimento
 
     def _get_state_key(self, state_list):
         """Converte o estado em uma chave de dicionário imutável."""
@@ -79,27 +81,25 @@ class QLearningAgent:
         return list(map(list, chosen_action_tuple))
 
     # [PROFESSOR] Equivalente a `novo_q` e a linha de atualização do Q-value
-    def update(self, state, action, reward, next_state, next_legal_actions):
+    # RENOMEAR MÉTODO e AJUSTAR PARÂMETROS E LÓGICA INTERNA
+    def learn(self, state, action, reward, next_state, done): # Modificado de update(..., next_legal_actions)
         """Atualiza a Q-Table e a Política para um passo (s, a, r, s')."""
         state_key = self._get_state_key(state)
         action_key = self._get_action_key(action)
         next_state_key = self._get_state_key(next_state)
 
         # Pega o Q-valor antigo
-        # [PROFESSOR] q_antigo = self.Q[estado][acao]
         old_value = self.get_q_value(state_key, action_key)
 
         # Calcula o melhor Q-valor para o próximo estado
-        # [PROFESSOR] max_a = np.max(self.Q[proximo_estado])
-        if not next_legal_actions:
-            next_max_q = 0.0
-        else:
-            next_q_values = [self.get_q_value(next_state_key, self._get_action_key(a)) for a in next_legal_actions]
-            next_max_q = max(next_q_values)
+        next_max_q = 0.0
+        if not done: # Se o episódio não terminou
+            # Se o próximo estado já tem valores Q conhecidos, pega o máximo
+            if next_state_key in self.q_table and self.q_table[next_state_key]:
+                next_max_q = max(self.q_table[next_state_key].values())
+            # Caso contrário, next_max_q permanece 0 (Q-valores para ações não exploradas são 0)
         
         # Calcula o novo valor Q
-        # [PROFESSOR] Q(s,a) <= alpha * q_antigo + (1-alpha) * (recompensa + desconto * max_a)
-        # A fórmula abaixo é matematicamente equivalente e mais comum
         new_value = old_value + self.alpha * (reward + self.desconto * next_max_q - old_value)
 
         # Atualiza a Q-Table
@@ -108,9 +108,10 @@ class QLearningAgent:
         self.q_table[state_key][action_key] = new_value
 
         # Atualiza a política para o estado atual
-        # [PROFESSOR] self.PI[estado] = np.argmax(self.Q[estado])
-        current_best_action = max(self.q_table[state_key], key=self.q_table[state_key].get)
-        self.policy[state_key] = current_best_action
+        # Garante que o estado existe na q_table e tem ações antes de tentar obter o max
+        if state_key in self.q_table and self.q_table[state_key]:
+            current_best_action = max(self.q_table[state_key], key=self.q_table[state_key].get)
+            self.policy[state_key] = current_best_action
 
     def save_policy(self, file_path=None):
         """Salva a Q-Table e a política em um arquivo."""
