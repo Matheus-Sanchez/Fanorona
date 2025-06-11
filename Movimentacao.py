@@ -3,6 +3,9 @@ import pygame
 class Movimentacao:
     DIRECOES_8 = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
     DIRECOES_4 = [(-1, 0), (0, -1), (0, 1), (1, 0)]
+    cor_borda_selecao = (0, 245, 94)  # Verde esmeralda
+    cor_borda_selecao_ativa = (243, 232, 238) # Branco lavanda
+    cor_posicao_proxima = (92, 24, 119)  # Roxo claro
 
     def __init__(self, tabuleiro_linhas, tabuleiro_colunas, tamanho_celula, tabuleiro_offset_x, tabuleiro_offset_y, gerenciador_pecas, configuracao_inicial):
         self.tabuleiro_linhas = tabuleiro_linhas
@@ -15,6 +18,7 @@ class Movimentacao:
         self.movimentos_possiveis = []  # Armazena os movimentos ativos
         self.configuracao_inicial = configuracao_inicial
         self.captura_ref = None  # Referência para o objeto Captura
+
 
     def set_captura_ref(self, captura):
         """Define a referência para o objeto Captura"""
@@ -190,7 +194,7 @@ class Movimentacao:
                         center_x = offset_x + j * tamanho_celula + tamanho_celula // 2
                         center_y = offset_y + i * tamanho_celula + tamanho_celula // 2
                         # Desenha um círculo verde com espessura 3 para chamar a atenção
-                        pygame.draw.circle(tela, (0, 255, 0), (center_x, center_y), tamanho_celula // 2 - 20, 3)
+                        pygame.draw.circle(tela, self.cor_borda_selecao, (center_x, center_y), tamanho_celula // 2 - 20, 3)
 
 
     def desenhar_movimentos(self, tela):
@@ -200,7 +204,7 @@ class Movimentacao:
             pos_x = self.tabuleiro_offset_x + (coluna * self.tamanho_celula) + self.tamanho_celula // 2
             pos_y = self.tabuleiro_offset_y + (linha * self.tamanho_celula) + self.tamanho_celula // 2
 
-            pygame.draw.circle(tela, (255, 0, 0), (pos_x, pos_y), 15)
+            pygame.draw.circle(tela, self.cor_posicao_proxima, (pos_x, pos_y), 15)
 
     def desenhar_borda_selecao(self, tela):
         if self.peca_selecionada is not None:
@@ -209,7 +213,7 @@ class Movimentacao:
             y = self.tabuleiro_offset_y + linha * self.tamanho_celula
 
             # Se a peça for a selecionada, desenha uma borda branca
-            pygame.draw.circle(tela, (255, 255, 255), (x + self.tamanho_celula // 2, y + self.tamanho_celula // 2), 30, 3)
+            pygame.draw.circle(tela, self.cor_borda_selecao_ativa, (x + self.tamanho_celula // 2, y + self.tamanho_celula // 2), 30, 3)
 
     def processar_eventos(self, evento):
         # Este método pode ser implementado para lidar com entradas de teclado
