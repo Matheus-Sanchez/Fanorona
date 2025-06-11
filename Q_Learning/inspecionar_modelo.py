@@ -7,7 +7,7 @@ def inspecionar_modelo_qlearning():
     Carrega e inspeciona a Q-Table e a política de Q-Learning salvas.
     """
     # Caminho para o modelo treinado
-    caminho_modelo = os.path.join(os.path.dirname(__file__), 'modelos', 'qlearning_policy.pkl')
+    caminho_modelo = os.path.join(os.path.dirname(__file__), 'modelos/treinamento1', 'qlearning_policy.pkl')
 
     if not os.path.exists(caminho_modelo):
         print(f"Arquivo de modelo não encontrado em: {caminho_modelo}")
