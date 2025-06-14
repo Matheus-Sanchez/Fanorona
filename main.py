@@ -46,11 +46,25 @@ def menu_inicial(tela):
     imagem_fundo = pygame.transform.scale(imagem_fundo, (LARGURA, ALTURA))
     opcoes = {
         "1": "Humano vs Humano", "2": "Humano vs MiniMax", "3": "MiniMax vs MiniMax",
-        "4": "Humano vs Q-Learning", "5": "MiniMax vs Q-Learning", "6": "Treinar IA (Q-Learning)",
+        "4": "Humano vs Q-Learning", "5": "MiniMax vs Q-Learning", 
+        "6": "Q-Learning vs Q-Learning", # CORRIGIDO TEXTO
+        "7": "Treinar IA (Q-Learning)", # MOVENDO TREINAR PARA 7 (já estava no código)
         "0": "Manual"
     }
+    # Desenhar o texto do menu na tela (opcional, mas bom para o usuário)
+    y_offset = 100
+    for key, value in opcoes.items():
+        text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
+        tela.blit(text_surface, (50, y_offset))
+        y_offset += 40
+
     while True:
-        tela.blit(imagem_fundo, (0, 0))
+        tela.blit(imagem_fundo, (0, 0)) # Redesenha o fundo
+        y_offset = 100 # Reset y_offset
+        for key, value in opcoes.items(): # Redesenha o texto do menu
+            text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
+            tela.blit(text_surface, (50, y_offset))
+            y_offset += 40
         pygame.display.flip()
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT or (evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE):
@@ -62,7 +76,7 @@ def menu_inicial(tela):
                 if evento.key in (pygame.K_3, pygame.K_KP3): return "mm_vs_mm"
                 if evento.key in (pygame.K_4, pygame.K_KP4): return "h_vs_q"
                 if evento.key in (pygame.K_5, pygame.K_KP5): return "mm_vs_q"
-                if evento.key in (pygame.K_6, pygame.K_KP6): return "_qvs_q"
+                if evento.key in (pygame.K_6, pygame.K_KP6): return "q_vs_q" # CORRIGIDO RETORNO
                 if evento.key in (pygame.K_7, pygame.K_KP7): return "train_q"
                 if evento.key in (pygame.K_0, pygame.K_KP0): exibir_imagem(tela)  # Chama a função de exibir imagem/manual ilustrado
 
@@ -158,6 +172,7 @@ def jogo(modo):
         tipos_jogadores[cor_ia] = 'MINIMAX' if modo == "h_vs_mm" else 'QLEARNING'
     elif modo == "mm_vs_mm": tipos_jogadores.update({'v': 'MINIMAX', 'b': 'MINIMAX'})
     elif modo == "mm_vs_q": tipos_jogadores.update({'v': 'MINIMAX', 'b': 'QLEARNING'})
+    elif modo == "q_vs_q": tipos_jogadores.update({'v': 'QLEARNING', 'b': 'QLEARNING'}) # ADICIONADO MODO Q_VS_Q
 
     configuracao_inicial = [["v"]*9, ["v"]*9, ["b", "v", "b", "v", "-", "b", "v", "b", "v"], ["b"]*9, ["b"]*9]
     tabuleiro = Tabuleiro(LARGURA, ALTURA)
@@ -217,7 +232,7 @@ def jogo(modo):
             melhor_jogada = None
             if tipo_jogador_atual == 'MINIMAX':
                 # --- USA A VERSÃO PARALELA ---
-                melhor_jogada = escolher_movimento_ia_paralelo(estado_atual, jogador_atual, depth=4, num_threads=NUM_THREADS)
+                melhor_jogada = escolher_movimento_ia_paralelo(estado_atual, jogador_atual, depth=6, num_threads=NUM_THREADS)
             else: # QLEARNING
                 melhor_jogada = escolher_movimento_qlearning(estado_atual, jogador_atual)
             
@@ -284,8 +299,10 @@ def main():
             try: train_agent()
             except Exception as e: print(f"Ocorreu um erro: {e}")
             exibir_tela_final("Treinamento concluído!")
-        elif modo_escolhido: jogo(modo_escolhido)
-        else: break
+        elif modo_escolhido in ["h_vs_h", "h_vs_mm", "mm_vs_mm", "h_vs_q", "mm_vs_q", "q_vs_q"]: # ADICIONADO "q_vs_q"
+            jogo(modo_escolhido)
+        else: # Se modo_escolhido for None (ESC no menu) ou não reconhecido
+            break # Sai do loop principal e encerra o programa
 
 if __name__ == "__main__":
     main()
