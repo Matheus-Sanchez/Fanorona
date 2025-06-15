@@ -47,24 +47,27 @@ def menu_inicial(tela):
     opcoes = {
         "1": "Humano vs Humano", "2": "Humano vs MiniMax", "3": "MiniMax vs MiniMax",
         "4": "Humano vs Q-Learning", "5": "MiniMax vs Q-Learning", 
-        "6": "Q-Learning vs Q-Learning", # CORRIGIDO TEXTO
-        "7": "Treinar IA (Q-Learning)", # MOVENDO TREINAR PARA 7 (já estava no código)
+        "6": "Q-Learning vs Q-Learning",
+        "7": "Treinar IA (Q-Learning)",
         "0": "Manual"
     }
-    # Desenhar o texto do menu na tela (opcional, mas bom para o usuário)
-    y_offset = 100
-    for key, value in opcoes.items():
-        # text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
-        tela.blit(text_surface, (50, y_offset))
-        y_offset += 40
+    # Remover o bloco que desenhava o texto do menu inicialmente, pois a imagem já contém as opções.
+    # y_offset = 100
+    # for key, value in opcoes.items():
+    #     # text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
+    #     # tela.blit(text_surface, (50, y_offset)) # Linha que causava o erro e deve ser removida
+    #     y_offset += 40
 
     while True:
         tela.blit(imagem_fundo, (0, 0)) # Redesenha o fundo
-        y_offset = 100 # Reset y_offset
-        for key, value in opcoes.items(): # Redesenha o texto do menu
-            text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
-            tela.blit(text_surface, (50, y_offset))
-            y_offset += 40
+        
+        # Remover o bloco que redesenhava o texto do menu a cada frame do loop.
+        # y_offset = 100 
+        # for key, value in opcoes.items(): 
+        #     text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
+        #     tela.blit(text_surface, (50, y_offset))
+        #     y_offset += 40
+            
         pygame.display.flip()
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT or (evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE):
