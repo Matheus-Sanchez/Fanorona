@@ -14,16 +14,16 @@ os.makedirs(MODELO_DIR, exist_ok=True)
 
 # Hiperparâmetros
 # ALTERAÇÃO 2: Aumentar drasticamente o número de episódios
-NUM_EPISODIOS = 1000
+NUM_EPISODIOS = 10000
 # ALTERAÇÃO 3: Diminuir a taxa de aprendizado para um ajuste fino (já era 0.001 no seu arquivo)
-ALFA = 0.01
+ALFA = 0.001
 GAMMA = 0.999
 EPSILON = 1.0
 MIN_EPSILON = 0.001
 # ALTERAÇÃO 4: Tornar o decaimento mais lento para uma exploração mais longa
 DECAY_RATE = 0.9995
-# Salva a cada 1000 episódios
-CHECKPOINT_INTERVAL = 100
+# Salva a cada 500 episódios
+CHECKPOINT_INTERVAL = 500
 STATS_UPDATE_INTERVAL = 100 # Mantido, pois não há alteração explícita no uso
 WINDOW = 100
 

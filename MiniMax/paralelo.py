@@ -2,7 +2,8 @@
 
 import threading
 import math
-from typing import Optional, Move, State
+from typing import Optional # Mantenha Optional de typing
+from .gerador_movimentos import State, Move # Importe State e Move do local correto
 from .alpha_beta import TranspositionTable, alpha_beta_search, init_zobrist # Usamos a mesma lógica de busca
 from .gerador_movimentos import generate_moves, aplicar_movimento
 
