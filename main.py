@@ -54,7 +54,7 @@ def menu_inicial(tela):
     # Desenhar o texto do menu na tela (opcional, mas bom para o usuário)
     y_offset = 100
     for key, value in opcoes.items():
-        text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
+        # text_surface = FONTE_MENU.render(f"[{key}] {value}", True, COR_BRANCO)
         tela.blit(text_surface, (50, y_offset))
         y_offset += 40
 
